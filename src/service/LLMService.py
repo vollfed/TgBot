@@ -1,12 +1,31 @@
+import locale
 import requests
+
+from babel.dates import format_date, format_time
+from datetime import datetime
+
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL_NAME = "dolphin-llama3"
 
-def summarize_text(large_text: str) -> str:
+def get_localized_datetime_babel(lang_code: str):
+    now = datetime.now()
+    # full date, e.g. "Tuesday, May 16, 2025" or "вторник, 16 мая 2025 г."
+    localized_date = format_date(now, format="full", locale=lang_code)
+    # time, e.g. "15:23:01"
+    localized_time = format_time(now, format="medium", locale=lang_code)
+    return localized_date, localized_time
+
+def summarize_text(large_text: str, title:str, pref_lang : str) -> str:
+    date_str, time_str = get_localized_datetime_babel(pref_lang)
+
     prompt = (
-        "Summarize the following text into 1-2 pages, focusing on key points and important facts. "
-        "Avoid unnecessary repetition and keep the structure clear and informative:\n\n"
+        f"Please answer in {pref_lang}.\n"
+        f"Video title: {title}\n"
+        f"Current date: {date_str}\n"
+        f"Current time: {time_str}\n\n"
+        "Summarize the following video transcript into 1-2 pages, focusing on key points and important facts. "
+        "Avoid unnecessary repetition and keep the structure clear, concise, and informative:\n\n"
         f"{large_text}\n\n"
         "Summary:"
     )

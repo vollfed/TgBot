@@ -1,0 +1,102 @@
+2025-05-15 22:30:43,117 - INFO - User 424275607 (Vollfed) failed /setlang usage. Reply: Please provide a language code, e.g. /setlang en
+2025-05-15 22:31:23,044 - INFO - User 424275607 (Vollfed) failed /setlang usage. Reply: Please provide a language code, e.g. /setlang en
+2025-05-15 22:31:32,110 - INFO - User 424275607 (Vollfed) set language: en. Reply: Language set to 'en'. Now send /transcript <youtube_url>
+2025-05-15 22:31:44,419 - INFO - User 424275607 (Vollfed) requested transcript for video 'DpMcC-E5l5c' with lang 'en'
+2025-05-15 22:34:40,418 - INFO - User 424275607 (Vollfed) set language: en. Reply: Language set to 'en'. Now send /transcript <youtube_url>
+2025-05-15 22:34:49,624 - INFO - User 424275607 (Vollfed) requested transcript for video 'DpMcC-E5l5c' with lang 'en'
+2025-05-15 22:34:50,506 - INFO - Transcript sent to user 424275607 (Vollfed), length 5765 chars
+2025-05-15 23:24:39,812 - INFO - User 424275607 (Vollfed) set language: en. Reply: Language set to 'en'. Now send /transcript <youtube_url>
+2025-05-15 23:24:52,829 - INFO - User 424275607 (Vollfed) requested transcript for video 'DpMcC-E5l5c' with lang 'en'
+2025-05-15 23:24:53,666 - INFO - Transcript finished
+2025-05-15 23:28:12,680 - INFO - User 424275607 (Vollfed) tried /transcript without language set. Reply: Better set your language first using /setlang <language_code>. en will be used
+2025-05-15 23:28:12,822 - INFO - User 424275607 (Vollfed) requested transcript for video 'DpMcC-E5l5c' with lang 'en'
+2025-05-15 23:28:13,577 - INFO - Transcript finished
+2025-05-15 23:28:21,789 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-15 23:28:22,252 - INFO - Transcript sent to user 424275607 (Vollfed), length 5765 chars
+2025-05-15 23:28:39,113 - INFO - User 424275607 (Vollfed) requested summary'
+2025-05-15 23:28:51,138 - INFO - Summary sent to user 424275607 (Vollfed), length 645 chars
+2025-05-15 23:51:49,301 - INFO - User 424275607 (Vollfed) requested transcript for video 'Xsp3_a-PMTw' with lang 'en'
+2025-05-15 23:51:50,154 - INFO - Transcript finished
+2025-05-15 23:51:56,281 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-15 23:51:56,454 - INFO - Transcript sent to user 424275607 (Vollfed), length 168 chars
+2025-05-16 00:12:31,517 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'. Now send /transcript <youtube_url>
+2025-05-16 00:12:41,106 - INFO - User 424275607 (Vollfed) requested transcript for video 'N5R2cBLLqE4' with lang 'ru'
+2025-05-16 00:12:41,769 - INFO - Transcript finished
+2025-05-16 00:12:48,180 - INFO - User 424275607 (Vollfed) requested summary'
+2025-05-16 00:13:03,046 - INFO - Summary sent to user 424275607 (Vollfed), length 1038 chars
+2025-05-16 11:04:55,617 - INFO - User 424275607 (Vollfed) requested transcript for video 't5Ao_LwCo-I' with lang 'ru'
+2025-05-16 11:04:56,213 - INFO - Transcript finished
+2025-05-16 11:05:27,649 - INFO - User 424275607 (Vollfed) requested summary'
+2025-05-16 11:05:36,477 - INFO - Summary sent to user 424275607 (Vollfed), length 150 chars
+2025-05-16 11:05:49,938 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-16 11:05:50,171 - INFO - Transcript sent to user 424275607 (Vollfed), length 53 chars
+2025-05-16 11:06:05,071 - INFO - User 424275607 (Vollfed) requested transcript for video 't5Ao_LwCo-I' with lang 'ru'
+2025-05-16 11:06:05,758 - INFO - Transcript finished
+2025-05-16 11:06:09,404 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-16 11:06:09,571 - INFO - Transcript sent to user 424275607 (Vollfed), length 53 chars
+2025-05-16 11:06:15,554 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'. Now send /transcript <youtube_url>
+2025-05-16 11:06:22,485 - INFO - User 424275607 (Vollfed) requested transcript for video 't5Ao_LwCo-I' with lang 'ru'
+2025-05-16 11:06:23,083 - INFO - Transcript finished
+2025-05-16 11:06:26,398 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-16 11:06:27,145 - INFO - Transcript sent to user 424275607 (Vollfed), length 13348 chars
+2025-05-16 11:07:00,057 - INFO - User 424275607 (Vollfed) requested summary'
+2025-05-16 11:07:09,497 - INFO - Summary sent to user 424275607 (Vollfed), length 1610 chars
+2025-05-16 21:30:18,657 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'. Now send /transcript <youtube_url>
+2025-05-16 21:32:36,903 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 21:43:04,377 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 21:43:14,076 - INFO - User 424275607 had no recent YouTube URL.
+2025-05-16 21:43:31,938 - INFO - User 424275607 had no recent YouTube URL.
+2025-05-16 21:45:07,306 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 21:46:09,274 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 21:46:17,052 - INFO - Transcript saved
+2025-05-16 21:46:24,881 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-16 21:46:25,436 - INFO - Transcript sent to user 424275607 (Vollfed), length 15848 chars
+2025-05-16 21:54:04,911 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 21:54:14,984 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 21:54:14,986 - INFO - Transcript finished
+2025-05-16 21:54:29,151 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 21:54:29,151 - INFO - Transcript finished
+2025-05-16 21:54:51,903 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'en'
+2025-05-16 21:54:58,099 - INFO - Transcript finished
+2025-05-16 21:56:34,796 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'en'
+2025-05-16 21:57:33,831 - INFO - Transcript finished
+2025-05-16 21:57:45,280 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 21:57:54,378 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 21:57:57,058 - INFO - Transcript finished
+2025-05-16 21:59:58,741 - INFO - User 424275607 (Vollfed) used /start command. Reply: Hi!
+2025-05-16 22:00:29,230 - INFO - User 424275607 (Vollfed) used /start command. Reply: Hi!
+2025-05-16 22:00:41,241 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 22:01:17,939 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:03:03,047 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 22:03:09,168 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:03:11,562 - INFO - Transcript finished
+2025-05-16 22:03:27,069 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:04:07,603 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 22:04:22,914 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:05:37,886 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 22:05:44,654 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:05:44,656 - INFO - Transcript finished
+2025-05-16 22:06:10,609 - INFO - User 424275607 (Vollfed) set language: ru. Reply: Language set to 'ru'.
+2025-05-16 22:06:16,582 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:06:52,862 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:08:47,472 - INFO - User 424275607 (Vollfed) failed /sl usage. Reply: Please provide a language code, e.g. /sl en
+2025-05-16 22:09:05,105 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:09:26,344 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:30:51,198 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:31:48,668 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:32:59,191 - INFO - Transcript finished
+2025-05-16 22:32:59,789 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:41:20,960 - INFO - User 424275607 had no recent YouTube URL.
+2025-05-16 22:42:03,147 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:42:21,525 - INFO - Transcript finished
+2025-05-16 22:42:27,679 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:45:30,982 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:45:44,095 - INFO - Transcript finished
+2025-05-16 22:45:58,498 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-16 22:45:58,660 - INFO - Transcript sent to user 424275607 (Vollfed), length 53 chars
+2025-05-16 22:46:04,274 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:46:55,276 - INFO - Transcript finished
+2025-05-16 22:49:47,781 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 22:49:55,060 - INFO - Transcript finished
+2025-05-16 22:51:05,873 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-16 22:51:06,457 - INFO - Transcript sent to user 424275607 (Vollfed), length 15848 chars
