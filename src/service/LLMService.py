@@ -21,13 +21,11 @@ def summarize_text(large_text: str, title:str, pref_lang : str) -> str:
 
     prompt = (
         f"Please answer in {pref_lang}.\n"
-        f"Video title: {title}\n"
         f"Current date: {date_str}\n"
         f"Current time: {time_str}\n\n"
         "Summarize the following video transcript into 1-2 pages, focusing on key points and important facts. "
         "Avoid unnecessary repetition and keep the structure clear, concise, and informative:\n\n"
         f"{large_text}\n\n"
-        "Summary:"
     )
 
     payload = {
@@ -40,7 +38,9 @@ def summarize_text(large_text: str, title:str, pref_lang : str) -> str:
         response = requests.post(OLLAMA_URL, json=payload)
         response.raise_for_status()
         data = response.json()
-        return data.get("response", "⚠️ No response from model.")
+        summary = data.get("response", "⚠️ No response from model.")
+        # Append title to the summary result (clearly labeled)
+        return f"**{title}**\n\nSummary:\n{summary}"
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
@@ -58,5 +58,5 @@ As the years passed, Elara’s legacy grew, reminding everyone that curiosity an
 # Example usage
 if __name__ == "__main__":
     long_text = get_mock_text()
-    summary = summarize_text(long_text)
+    summary = summarize_text(long_text, 'Foo  title', "ru")
     print("🔍 Summary:\n", summary)

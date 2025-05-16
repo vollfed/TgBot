@@ -52,6 +52,8 @@ def fetch_transcript(video_id, lang):
         langs = ["en", "ru"]
 
     try:
+        result_lang = langs[0]
+
         transcript_list = YouTubeTranscriptApi().list(video_id)
         generated_langs = set(transcript_list._generated_transcripts.keys())
         manual_langs = set(transcript_list._manually_created_transcripts.keys())
@@ -63,6 +65,7 @@ def fetch_transcript(video_id, lang):
             try:
                 transcript_obj = transcript_list.find_transcript([lang])
                 if transcript_obj:
+                    result_lang = lang
                     break
             except NoTranscriptFound:
                 continue
@@ -71,6 +74,7 @@ def fetch_transcript(video_id, lang):
             return {
                 "text": f"No transcript found for languages: {', '.join(langs)}.",
                 "available_languages": available_langs,
+                "selected_language": result_lang,
                 "title": title
             }
 
@@ -80,6 +84,7 @@ def fetch_transcript(video_id, lang):
         return {
             "text": full_text,
             "available_languages": available_langs,
+            "selected_language": result_lang,
             "title": title
         }
 
@@ -87,17 +92,20 @@ def fetch_transcript(video_id, lang):
         return {
             "text": "Transcripts are disabled for this video.",
             "available_languages": [],
+            "selected_language": "",
             "title": title
         }
     except CouldNotRetrieveTranscript:
         return {
             "text": "Could not retrieve transcript due to network or other error.",
             "available_languages": [],
+            "selected_language": "",
             "title": title
         }
     except Exception as e:
         return {
             "text": f"An error occurred: {e}",
             "available_languages": [],
+            "selected_language": "",
             "title": title
         }

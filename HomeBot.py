@@ -21,13 +21,13 @@ logger.setLevel(logging.DEBUG)  # Capture everything, handlers will filter
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
 # Info Handler
-info_handler = RotatingFileHandler("logs/homebot.log", maxBytes=1_000_000, backupCount=3)
+info_handler = RotatingFileHandler("logs/homebot.log", maxBytes=1_000_000, backupCount=3,encoding='utf-8')
 info_handler.setLevel(logging.INFO)
 info_handler.setFormatter(formatter)
 logger.addHandler(info_handler)
 
 # Debug Handler (separate file)
-debug_handler = RotatingFileHandler("logs/homebot.debug.log", maxBytes=1_000_000, backupCount=2)
+debug_handler = RotatingFileHandler("logs/homebot.debug.log", maxBytes=1_000_000, backupCount=2,encoding='utf-8')
 debug_handler.setLevel(logging.DEBUG)
 debug_handler.setFormatter(formatter)
 logger.addHandler(debug_handler)
@@ -148,16 +148,20 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_last_ts[user.id] = result['text']
     user_last_title[user.id] = result['title']
+    user_languages[user.id] = result['selected_language']
 
     logger.info("Transcript finished")
 
     if lang not in result["available_languages"]:
         await update.message.reply_text(
-            f"⚠️ Transcript for '{lang}' not found.\n")
+            f"⚠️ Transcript for your selected lang - '{lang}' not found.\n")
     else:
         await update.message.reply_text("Transcript saved.")
 
-    await update.message.reply_text(f"Available languages: {', '.join(result['available_languages'])}")
+    await update.message.reply_text(
+        f"Available languages: {', '.join(result['available_languages'])}\n"
+        f"Selected language: {result['selected_language']}"
+    )
 
 async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -173,7 +177,7 @@ async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"User {user.id} ({user.username}) requested summary'")
 
     result = user_last_ts[user.id]
-    title =   user_last_title[user.id]
+    title = user_last_title[user.id]
     lang = user_languages[user.id]
 
     result = summarize_text(result,title, lang)
