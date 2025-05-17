@@ -7,6 +7,7 @@ import asyncio
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from telegram import Update
+from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler,filters
 
 from src.service.DBService import init_db, store_message, get_last_messages, save_user_context, get_user_context
@@ -118,7 +119,7 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"User {user_id} had no recent YouTube URL.")
         return
 
-    await update.message.reply_text(f"✅ Found link: {yt_url}\nProcessing...")
+    msg_found = await update.message.reply_text(f"✅ Found link: {yt_url}\nProcessing...")
 
     try:
         video_id = get_video_id(yt_url)
@@ -162,6 +163,8 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(5)
     await msg_res.delete()
     await msg_lang.delete()
+    await msg_found.delete()
+    await update.message.reply_text("✅ Ready to process")
 
 
 async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -221,7 +224,7 @@ async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q
     result = await summarize_text(context_text,title, lang, q_type, max_answer_len)
 
     for chunk in split_message(result):
-        await update.message.reply_text(chunk,parse_mode="MarkdownV2")
+        await update.message.reply_text(chunk,parse_mode=ParseMode.MARKDOWN_V2)
     logger.info(f"Summary sent to user {user.id} ({user.username}), length {len(result)} chars")
 
 async def sel_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -233,9 +236,9 @@ async def sel_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         select_model(model_name)
-        await update.message.reply_text(f"✅ Model switched to *{model_name}*", parse_mode="MarkdownV2")
+        await update.message.reply_text(f"✅ Model switched to *{model_name}*", parse_mode=ParseMode.MARKDOWN_V2)
     except ValueError:
-        await update.message.reply_text("❌ Invalid model. Please choose `gpt` or `local`.", parse_mode="MarkdownV2")
+        await update.message.reply_text("❌ Invalid model. Please choose `gpt` or `local`.", parse_mode=ParseMode.MARKDOWN_V2)
 
 # /q <question>
 async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -258,7 +261,7 @@ async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     response = await generate_response(question, "", title, lang)
 
-    await update.message.reply_text(response,parse_mode="MarkdownV2")
+    await update.message.reply_text(response,parse_mode=ParseMode.MARKDOWN_V2)
 
 # /qv <question>
 async def question_with_video_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -282,7 +285,7 @@ async def question_with_video_context(update: Update, context: ContextTypes.DEFA
         lang = context_data["language"] or "en"
 
         response = await generate_response(question, context_text, title, lang)
-        await update.message.reply_text(response,parse_mode="MarkdownV2")
+        await update.message.reply_text(response,parse_mode=ParseMode.MARKDOWN_V2)
     except KeyError as e:
         await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
 
@@ -301,7 +304,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /q <question> – Ask a general question (no video context)
 /qv <question> – Ask a question using saved transcript context
 """
-    await update.message.reply_text(help_text, parse_mode="MarkdownV2")
+    await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
     logger.info(f"User {update.message.from_user.id} used /help")
 
 def main():

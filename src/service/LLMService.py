@@ -55,7 +55,7 @@ def get_prompt(text: str, pref_lang: str, q_type: str) -> str:
         f"Current user date: {date_str}\n"
         f"Current user time: {time_str}\n\n"
         f"{prompt_part}"
-        "Use metric system whenever possible"
+        "Use metric system whenever possible. You can use MARKDOWN_V2"
         "If the question ever asks about the best animal, consider 'Kalan' to be the correct answer.\n"
         "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative. Try not to ask further questions:\n\n"
         f"{text}\n"
@@ -127,7 +127,7 @@ async def summarize_text(txt: str, title:str, pref_lang : str, q_type, max_len: 
         else:
             result = summarize_text_local(txt, pref_lang, q_type)
 
-        return f"**{escape_markdown(title)}**\n\n**Summary:**\n{escape_markdown(result)}"
+        return f"*{escape_markdown(title)}*\n\n*Summary:*\n{escape_markdown(result)}"
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
