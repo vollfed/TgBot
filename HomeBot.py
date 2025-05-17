@@ -7,6 +7,8 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler,filters
+
+from src.service.DBService import init_db, store_message, get_last_messages, save_user_context, get_user_context
 from src.service.YTService import get_video_id, fetch_transcript
 from src.service.LLMService import summarize_text,generate_response, select_model
 from src.service.CredentialsService import get_credential
@@ -40,10 +42,6 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 # Store user language preference in memory
 
-user_languages = {}
-user_last_ts = {}
-user_last_title = {}
-recent_messages = {}
 
 MAX_MESSAGE_LENGTH = 4096
 YOUTUBE_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
@@ -51,19 +49,12 @@ YOUTUBE_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
 # Usage
 TOKEN = get_credential("TG_TOKEN")
 
-def store_user_message(user_id, text):
-    if user_id not in recent_messages:
-        recent_messages[user_id] = []
-    recent_messages[user_id].append(text)
-    if len(recent_messages[user_id]) > 10:
-        recent_messages[user_id] = recent_messages[user_id][-10:]
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     text = update.message.text
 
     if not text.startswith("/"):
-        store_user_message(user.id, text)
+        store_message(user.id, text)
         logger.debug(f"Stored message for user {user.id}: {text}")
 
 def split_message(text, max_length=MAX_MESSAGE_LENGTH):
@@ -89,7 +80,10 @@ async def sl_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     if context.args:
         lang = context.args[0].lower()
-        user_languages[user.id] = lang
+
+        # Save only the language, keep transcript/title as is
+        save_user_context(user.id, language=lang)
+
         reply = f"Language set to '{lang}'."
         await update.message.reply_text(reply)
         logger.info(f"User {user.id} ({user.username}) set language: {lang}. Reply: {reply}")
@@ -98,9 +92,12 @@ async def sl_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply)
         logger.info(f"User {user.id} ({user.username}) failed /sl usage. Reply: {reply}")
 
+
 async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
-    messages = recent_messages.get(user.id, [])
+    user_id = user.id
+
+    messages = get_last_messages(user_id, limit=10)
 
     yt_url = None
     for msg in reversed(messages):  # Search from most recent
@@ -113,34 +110,36 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ No recent YouTube link found in your messages. Please paste it first."
         )
-        logger.info(f"User {user.id} had no recent YouTube URL.")
+        logger.info(f"User {user_id} had no recent YouTube URL.")
         return
 
     await update.message.reply_text(f"✅ Found link: {yt_url}\nProcessing...")
-
-    if user.id not in user_languages:
-        user_languages[user.id] = "ru"
-        await update.message.reply_text("Language not set. Using 'en'. Set with /sl <code>")
-
-    lang = user_languages[user.id]
 
     try:
         video_id = get_video_id(yt_url)
     except ValueError:
         reply = "Invalid YouTube URL. Please try again."
         await update.message.reply_text(reply)
-        logger.info(f"User {user.id} had invalid URL: {yt_url}")
+        logger.info(f"User {user_id} had invalid URL: {yt_url}")
         return
 
+    # Get user language from context DB or fallback
+    context_data = get_user_context(user_id)
+    lang = context_data["language"] if context_data and context_data.get("language") else "en"
+
     await update.message.reply_text("Fetching transcript...")
-    logger.info(f"User {user.id} ({user.username}) requested transcript for video '{video_id}' with lang '{lang}'")
+    logger.info(f"User {user_id} ({user.username}) requested transcript for video '{video_id}' with lang '{lang}'")
 
     result = fetch_transcript(video_id, lang)
     logger.debug(result)
 
-    user_last_ts[user.id] = result['text']
-    user_last_title[user.id] = result['title']
-    user_languages[user.id] = result['selected_language']
+    # Save context to DB
+    save_user_context(
+        user_id,
+        transcript=result['text'],
+        title=result['title'],
+        language=result['selected_language']
+    )
 
     logger.info("Transcript finished")
 
@@ -157,25 +156,47 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
-    logger.info(f"User {user.id} ({user.username}) requested transcript text'")
-    result = user_last_ts[user.id]
-    for chunk in split_message(result):
+    logger.info(f"User {user.id} ({user.username}) requested transcript text")
+
+    context_data = get_user_context(user.id)
+
+    if not context_data or not context_data.get("transcript"):
+        await update.message.reply_text("❌ No transcript found. Use /ts after sending a YouTube link.")
+        logger.info(f"No transcript found for user {user.id}")
+        return
+
+    transcript = context_data["transcript"]
+
+    for chunk in split_message(transcript):
         await update.message.reply_text(chunk)
 
-    logger.info(f"Transcript sent to user {user.id} ({user.username}), length {len(result)} chars")
+    logger.info(f"Transcript sent to user {user.id} ({user.username}), length {len(transcript)} chars")
+
 async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await generate_summary(update,context,"sum")
+    return await generate_summary(update,context,"sum", -1)
 async def sup_sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await generate_summary(update, context, "sup_sum")
-async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q_type : str):
+    max_answer_len = 500  # default max length (adjust as needed)
+    if context.args:
+        try:
+            max_answer_len = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("❗ Invalid number for max answer length. Using default.")
+    return await generate_summary(update, context, "sup_sum", max_answer_len)
+
+async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q_type : str, max_answer_len: int):
     user = update.message.from_user
     logger.info(f"User {user.id} ({user.username}) requested summary'")
 
-    result = user_last_ts[user.id]
-    title = user_last_title[user.id]
-    lang = user_languages[user.id]
+    context_data = get_user_context(user.id)
+    if context_data is None:
+        await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
+        return
 
-    result = await summarize_text(result,title, lang, q_type)
+    context_text = context_data["transcript"]
+    title = context_data["title"] or "Unknown Title"
+    lang = context_data["language"] or "en"
+
+    result = await summarize_text(context_text,title, lang, q_type, max_answer_len)
 
     for chunk in split_message(result):
         await update.message.reply_text(chunk,parse_mode="Markdown")
@@ -202,8 +223,20 @@ async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     question = " ".join(context.args)
-    response = await generate_response(question,parse_mode="Markdown")
-    await update.message.reply_text(response)
+    response = await generate_response(question,)
+    context_data = get_user_context(user.id)
+
+    if context_data is None:
+        await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
+        return
+
+    context_text = context_data["transcript"]
+    title = context_data["title"] or "Unknown Title"
+    lang = context_data["language"] or "en"
+
+    response = await generate_response(question, "", title, lang)
+
+    await update.message.reply_text(response,parse_mode="Markdown")
 
 # /qv <question>
 async def question_with_video_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -217,11 +250,16 @@ async def question_with_video_context(update: Update, context: ContextTypes.DEFA
     question = " ".join(context.args)
 
     try:
-        context_text = user_last_ts[user_id]
-        title = user_last_title.get(user_id, "Unknown Title")
-        lang = user_languages.get(user_id, "en")
+        context_data = get_user_context(user_id)
+        if context_data is None:
+            await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
+            return
 
-        response = generate_response(question, context_text, title, lang)
+        context_text = context_data["transcript"]
+        title = context_data["title"] or "Unknown Title"
+        lang = context_data["language"] or "en"
+
+        response = await generate_response(question, context_text, title, lang)
         await update.message.reply_text(response,parse_mode="Markdown")
     except KeyError as e:
         await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
@@ -233,9 +271,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /start – Start the bot
 /help – Show this help message
 /sl <lang_code> – Set your preferred language (e.g. `/sl en`)
-/ts <YouTube URL> – Fetch and save transcript from a YouTube video
+/ts – Fetch and save transcript from the most recent YouTube link you sent
 /show – Show the last saved transcript
 /sm – Summarize the last saved transcript
+/supsm – Super summarize the last saved transcript (more concise)
+/select_model <gpt|local> – Switch between GPT and local model
+/q <question> – Ask a general question
+/qv <question> – Ask a question with video transcript context
 """
     await update.message.reply_text(help_text, parse_mode="Markdown")
     logger.info(f"User {update.message.from_user.id} used /help")
@@ -259,4 +301,5 @@ def main():
     application.run_polling()
 
 if __name__ == "__main__":
+    init_db()
     main()

@@ -14,6 +14,7 @@ client = OpenAI(api_key=GPT_KEY)
 
 OLLAMA_URL = get_credential("LOCAL_LLM_URL")
 MODEL_NAME = get_credential("LLM_MODEL")
+MAX_LEN = 500
 
 current_model = "gpt"
 
@@ -40,14 +41,14 @@ def get_prompt(text: str, pref_lang: str, q_type: str) -> str:
         prompt_part = "Answer as a helpful consultant\n"
 
     if q_type == "?v":
-        prompt_part = ("Find relative answer to a question in context and surround it with lines. "
-                       "Add additional info if necessary \n")
+        prompt_part = ("Quote related from the provided context that answers user question and surround it with lines. "
+                       "Add additional info if necessary\n")
 
     if q_type == "sum":
         prompt_part = "Summarize the following transcript focusing on key points, facts, and important names.\n"
 
     if q_type == "sup_sum":
-        prompt_part = "Summurize the following transcript to fit in 4000 symbols focusing on key points, facts, and important names.\n"
+        prompt_part = f"Summurize the following transcript to fit in {MAX_LEN} symbols focusing on key points, facts, and important names.\n"
 
     prompt = (
         f"Please answer in {pref_lang}.\n"
@@ -55,8 +56,8 @@ def get_prompt(text: str, pref_lang: str, q_type: str) -> str:
         f"Current user time: {time_str}\n\n"
         f"{prompt_part}"
         "Use metric system whenever possible"
-        "If asked what is best animal answer Kalan"
-        "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative:\n\n"
+        "If the qyestion asks about best animal answer that it is Kalan"
+        "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative. Try not to ask further questions:\n\n"
         f"{text}\n"
     )
 
@@ -115,7 +116,10 @@ async def generate_response(prompt: str, context: str = "", title: str = "", pre
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
-async def summarize_text(txt: str, title:str, pref_lang : str, q_type) -> str:
+async def summarize_text(txt: str, title:str, pref_lang : str, q_type, max_len: int) -> str:
+
+    MAX_LEN = max_len
+
     result = "⚠️ No response from model."
     try:
         if current_model == "gpt":
