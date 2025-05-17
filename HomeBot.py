@@ -187,7 +187,7 @@ async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang_override = context.args[0].lower() if context.args else None
     if lang_override:
         save_user_context(update.message.from_user.id, language=lang_override)
-    return await generate_summary(update, context, "sum", -1, lang_override)
+    return await generate_summary(update, context, "sum", -1)
 
 async def sup_sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     max_answer_len = 500
