@@ -8,7 +8,8 @@ from logging.handlers import RotatingFileHandler
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler,filters
 from src.service.YTService import get_video_id, fetch_transcript
-from src.service.LLMService import summarize_text
+from src.service.LLMService import summarize_text, select_model
+from src.service.CredentialsService import get_credential
 
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
@@ -47,17 +48,8 @@ recent_messages = {}
 MAX_MESSAGE_LENGTH = 4096
 YOUTUBE_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
 
-def get_token():
-    config_path = Path("src/resources/config.json")
-    if not config_path.exists():
-        raise FileNotFoundError(f"{config_path} not found. Please create it with your TOKEN.")
-
-    with config_path.open() as f:
-        config = json.load(f)
-    return config.get("TOKEN")
-
 # Usage
-TOKEN = get_token()
+TOKEN = get_credential("TG_TOKEN")
 
 def store_user_message(user_id, text):
     if user_id not in recent_messages:
@@ -186,6 +178,19 @@ async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(chunk)
     logger.info(f"Summary sent to user {user.id} ({user.username}), length {len(result)} chars")
 
+async def sel_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚠️ Usage: /model <gpt|local>")
+        return
+
+    model_name = context.args[0].lower()
+
+    try:
+        select_model(model_name)
+        await update.message.reply_text(f"✅ Model switched to *{model_name}*", parse_mode="Markdown")
+    except ValueError:
+        await update.message.reply_text("❌ Invalid model. Please choose `gpt` or `local`.", parse_mode="Markdown")
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
 🤖 *Available Commands*:
@@ -208,6 +213,7 @@ def main():
     application.add_handler(CommandHandler("show", show_command))
     application.add_handler(CommandHandler("sm", sum_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("select_model", sel_model_command))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
     print("Bot started...")

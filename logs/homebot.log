@@ -139,3 +139,17 @@
 2025-05-16 23:25:26,071 - INFO - Transcript finished
 2025-05-16 23:25:30,666 - INFO - User 424275607 (Vollfed) requested summary'
 2025-05-16 23:25:47,731 - INFO - Summary sent to user 424275607 (Vollfed), length 1841 chars
+2025-05-16 23:27:57,502 - INFO - User 424275607 (Vollfed) requested transcript for video 'mh1-gpnsmr4' with lang 'ru'
+2025-05-16 23:27:58,619 - INFO - Transcript finished
+2025-05-16 23:28:39,554 - INFO - User 424275607 (Vollfed) requested summary'
+2025-05-16 23:28:47,050 - INFO - Summary sent to user 424275607 (Vollfed), length 1131 chars
+2025-05-16 23:31:20,567 - INFO - User 424275607 (Vollfed) requested transcript for video 'jCTvblRXnzg' with lang 'ru'
+2025-05-16 23:31:22,120 - INFO - Transcript finished
+2025-05-16 23:31:27,431 - INFO - User 424275607 (Vollfed) requested summary'
+2025-05-16 23:31:34,840 - INFO - Summary sent to user 424275607 (Vollfed), length 1031 chars
+2025-05-17 00:32:38,476 - INFO - User 424275607 (Vollfed) requested transcript for video 'YH05BeB5L40' with lang 'en'
+2025-05-17 00:32:39,883 - INFO - Transcript finished
+2025-05-17 00:32:45,037 - INFO - User 424275607 (Vollfed) requested summary'
+2025-05-17 00:33:00,846 - INFO - Summary sent to user 424275607 (Vollfed), length 1445 chars
+2025-05-17 01:27:23,595 - INFO - User 424275607 (Vollfed) requested transcript text'
+2025-05-17 01:27:24,288 - INFO - Transcript sent to user 424275607 (Vollfed), length 20625 chars

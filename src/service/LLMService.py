@@ -1,48 +1,110 @@
 import locale
 import requests
+import re
 
+from openai import OpenAI
 from babel.dates import format_date, format_time
 from datetime import datetime
+from CredentialsService import get_credential
 
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
-MODEL_NAME = "dolphin-llama3"
+GPT_KEY = get_credential("GPT_KEY")
+
+client = OpenAI(api_key=GPT_KEY)
+
+OLLAMA_URL = get_credential("LOCAL_LLM_URL")
+MODEL_NAME = get_credential("LLM_MODEL")
+
+current_model = "gpt"
+
+def escape_markdown(text: str) -> str:
+    # Telegram uses MarkdownV2 syntax, so escape these characters
+    return re.sub(r'([_*[\]()~`>#+=|{}.!-])', r'\\\1', text)
+
+def select_model(model_name: str):
+    global current_model
+    if model_name not in ("local", "gpt"):
+        raise ValueError("model_name must be either 'local' or 'gpt'")
+    current_model = model_name
 
 def get_localized_datetime_babel(lang_code: str):
     now = datetime.now()
-    # full date, e.g. "Tuesday, May 16, 2025" or "вторник, 16 мая 2025 г."
     localized_date = format_date(now, format="full", locale=lang_code)
-    # time, e.g. "15:23:01"
     localized_time = format_time(now, format="medium", locale=lang_code)
     return localized_date, localized_time
 
-def summarize_text(large_text: str, title:str, pref_lang : str) -> str:
+def get_prompt(text: str, pref_lang: str, is_question: bool) -> str:
     date_str, time_str = get_localized_datetime_babel(pref_lang)
+
+    if is_question:
+        prompt_part = "Answer as a helpful consultant\n"
+    else:
+        prompt_part = "Summarize the following transcript focusing on key points, facts, and important names.\n"
 
     prompt = (
         f"Please answer in {pref_lang}.\n"
-        f"Current date: {date_str}\n"
-        f"Current time: {time_str}\n\n"
-        "Summarize the following video transcript into 1-2 pages, focusing on key points and important facts. "
+        f"Current user date: {date_str}\n"
+        f"Current user time: {time_str}\n\n"
+        f"{prompt_part}"
         "Avoid unnecessary repetition and keep the structure clear, concise, and informative:\n\n"
-        f"{large_text}\n\n"
+        f"{text}\n"
     )
 
+    return prompt
+def get_gpt_response(user_prompt, pref_lang, is_question):
+    tools = [{"type": "web_search_preview",
+                "search_context_size": "low",
+                "user_location": {
+                    "type": "approximate",
+                    "country": "RU",
+                    "city": "Moscow",
+                    "region": "Moscow",
+                }
+                }]
+
+    tools = []
+
+    response = client.responses.create(
+        model="gpt-4.1",
+        tools=tools,
+        input= get_prompt(user_prompt, pref_lang, is_question),
+        stream=False,
+        store=True
+    )
+
+    return response.output_text
+
+def get_local_response(txt: str, pref_lang : str, is_question) -> str:
     payload = {
         "model": MODEL_NAME,
-        "prompt": prompt,
+        "prompt": get_prompt(txt,pref_lang, is_question),
         "stream": False
     }
 
+    response = requests.post(OLLAMA_URL, json=payload)
+    response.raise_for_status()
+    data = response.json()
+    summary = data.get("response", "⚠️ No response from model.")
+    # Append title to the summary result (clearly labeled)
+    return summary
+
+def summarize_text(txt: str, title:str, pref_lang : str) -> str:
+    result = "⚠️ No response from model."
     try:
-        response = requests.post(OLLAMA_URL, json=payload)
-        response.raise_for_status()
-        data = response.json()
-        summary = data.get("response", "⚠️ No response from model.")
-        # Append title to the summary result (clearly labeled)
-        return f"**{title}**\n\nSummary:\n{summary}"
+        if current_model == "gpt":
+            result = summarize_text_gpt(txt, pref_lang)
+        else:
+            result = summarize_text_local(txt, pref_lang)
+
+        return f"**{escape_markdown(title)}**\n\n**Summary:**\n{result}"
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
+def summarize_text_gpt(txt: str, pref_lang : str) -> str:
+    return get_gpt_response(txt,pref_lang,False)
+
+def summarize_text_local(txt: str, pref_lang : str) -> str:
+    return get_local_response(txt,pref_lang,False)
+
 
 def get_mock_text() -> str:
     return """
@@ -58,5 +120,16 @@ As the years passed, Elara’s legacy grew, reminding everyone that curiosity an
 # Example usage
 if __name__ == "__main__":
     long_text = get_mock_text()
-    summary = summarize_text(long_text, 'Foo  title', "ru")
-    print("🔍 Summary:\n", summary)
+
+    # res = summarize_text(long_text, 'Foo  title', "ru")
+    # res = get_gpt_response("Current time", "ru", True)
+    # res = get_gpt_response("Current time in moscow", "ru", True)
+
+    select_model("local")
+    # res = summarize_text(long_text, 'Foo  title', "ru")
+    # res = get_local_response("Current time", "ru", True)
+    # res = get_local_response("Current time in moscow", "ru", True)
+
+    res = get_local_response("сколько лап у 3 котят", "ru", True)
+
+    print("🔍 Result:\n", res)
