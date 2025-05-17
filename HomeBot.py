@@ -3,6 +3,7 @@ import os
 import json
 import logging
 
+import asyncio
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from telegram import Update
@@ -56,6 +57,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text.startswith("/"):
         store_message(user.id, text)
         logger.debug(f"Stored message for user {user.id}: {text}")
+
+        match = re.search(YOUTUBE_REGEX, text)
+        if match:
+            return await ts_command(update, context)
 
 def split_message(text, max_length=MAX_MESSAGE_LENGTH):
     """Split text into chunks smaller than max_length without breaking words."""
@@ -127,7 +132,7 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context_data = get_user_context(user_id)
     lang = context_data["language"] if context_data and context_data.get("language") else "en"
 
-    await update.message.reply_text("Fetching transcript...")
+    msg_start = await update.message.reply_text("Fetching transcript...")
     logger.info(f"User {user_id} ({user.username}) requested transcript for video '{video_id}' with lang '{lang}'")
 
     result = fetch_transcript(video_id, lang)
@@ -147,12 +152,17 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"⚠️ Transcript for your selected lang - '{lang}' not found.\n")
     else:
-        await update.message.reply_text("Transcript saved.")
+        await msg_start.delete()
+        msg_res = await update.message.reply_text("Transcript saved.")
 
-    await update.message.reply_text(
+    msg_lang = await update.message.reply_text(
         f"Available languages: {', '.join(result['available_languages'])}\n"
         f"Selected language: {result['selected_language']}"
     )
+    await asyncio.sleep(5)
+    await msg_res.delete()
+    await msg_lang.delete()
+
 
 async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -173,15 +183,27 @@ async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Transcript sent to user {user.id} ({user.username}), length {len(transcript)} chars")
 
 async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await generate_summary(update,context,"sum", -1)
+    # Also support optional lang override in /sm (e.g. /sm en)
+    lang_override = context.args[0].lower() if context.args else None
+    if lang_override:
+        save_user_context(update.message.from_user.id, language=lang_override)
+    return await generate_summary(update, context, "sum", -1, lang_override)
+
 async def sup_sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    max_answer_len = 500  # default max length (adjust as needed)
-    if context.args:
-        try:
-            max_answer_len = int(context.args[0])
-        except ValueError:
-            await update.message.reply_text("❗ Invalid number for max answer length. Using default.")
+    max_answer_len = 500
+    lang_override = None
+
+    for arg in context.args:
+        if arg.isdigit():
+            max_answer_len = int(arg)
+        elif re.fullmatch(r"[a-z]{2}", arg.lower()):
+            lang_override = arg.lower()
+
+    if lang_override:
+        save_user_context(update.message.from_user.id, language=lang_override)
+
     return await generate_summary(update, context, "sup_sum", max_answer_len)
+
 
 async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q_type : str, max_answer_len: int):
     user = update.message.from_user
@@ -199,7 +221,7 @@ async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q
     result = await summarize_text(context_text,title, lang, q_type, max_answer_len)
 
     for chunk in split_message(result):
-        await update.message.reply_text(chunk,parse_mode="Markdown")
+        await update.message.reply_text(chunk,parse_mode="MarkdownV2")
     logger.info(f"Summary sent to user {user.id} ({user.username}), length {len(result)} chars")
 
 async def sel_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -211,9 +233,9 @@ async def sel_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         select_model(model_name)
-        await update.message.reply_text(f"✅ Model switched to *{model_name}*", parse_mode="Markdown")
+        await update.message.reply_text(f"✅ Model switched to *{model_name}*", parse_mode="MarkdownV2")
     except ValueError:
-        await update.message.reply_text("❌ Invalid model. Please choose `gpt` or `local`.", parse_mode="Markdown")
+        await update.message.reply_text("❌ Invalid model. Please choose `gpt` or `local`.", parse_mode="MarkdownV2")
 
 # /q <question>
 async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -236,7 +258,7 @@ async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     response = await generate_response(question, "", title, lang)
 
-    await update.message.reply_text(response,parse_mode="Markdown")
+    await update.message.reply_text(response,parse_mode="MarkdownV2")
 
 # /qv <question>
 async def question_with_video_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -260,7 +282,7 @@ async def question_with_video_context(update: Update, context: ContextTypes.DEFA
         lang = context_data["language"] or "en"
 
         response = await generate_response(question, context_text, title, lang)
-        await update.message.reply_text(response,parse_mode="Markdown")
+        await update.message.reply_text(response,parse_mode="MarkdownV2")
     except KeyError as e:
         await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
 
@@ -270,16 +292,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🤖 *Available Commands*:
 /start – Start the bot
 /help – Show this help message
-/sl <lang_code> – Set your preferred language (e.g. `/sl en`)
+/sl <lang_code> – Set your preferred transcript language (e.g. `/sl en`)
 /ts – Fetch and save transcript from the most recent YouTube link you sent
 /show – Show the last saved transcript
 /sm – Summarize the last saved transcript
-/supsm – Super summarize the last saved transcript (more concise)
-/select_model <gpt|local> – Switch between GPT and local model
-/q <question> – Ask a general question
-/qv <question> – Ask a question with video transcript context
+/ssm [max_len] [lang]– Super summarize with optional max length and responce lang (e.g. `/supsm 300 ru`)
+/select_model <gpt|local> – Switch between GPT or local model
+/q <question> – Ask a general question (no video context)
+/qv <question> – Ask a question using saved transcript context
 """
-    await update.message.reply_text(help_text, parse_mode="Markdown")
+    await update.message.reply_text(help_text, parse_mode="MarkdownV2")
     logger.info(f"User {update.message.from_user.id} used /help")
 
 def main():
@@ -290,7 +312,7 @@ def main():
     application.add_handler(CommandHandler("ts", ts_command))
     application.add_handler(CommandHandler("show", show_command))
     application.add_handler(CommandHandler("sm", sum_command))
-    application.add_handler(CommandHandler("supsm", sup_sum_command))
+    application.add_handler(CommandHandler("ssm", sup_sum_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("select_model", sel_model_command))
     application.add_handler(CommandHandler("q", question_command))
