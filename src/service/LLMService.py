@@ -19,8 +19,29 @@ MAX_LEN = 500
 current_model = "gpt"
 
 def escape_markdown(text: str) -> str:
+    return escape_markdown_telegram(text)
+
+def escape_markdown_old(text: str) -> str:
     # Telegram uses MarkdownV2 syntax, so escape these characters
     return re.sub(r'([_*[\]()~`>#+=|{}.!-])', r'\\\1', text)
+
+def escape_markdown_telegram(text: str) -> str:
+    # Replace bold/italic with placeholders
+    text = re.sub(r'\*\*(.+?)\*\*', r'<<BOLD>>\1<<ENDBOLD>>', text)
+    text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<<ITALIC>>\1<<ENDITALIC>>', text)
+
+    # Convert ### headings to bold
+    text = re.sub(r'^#{1,3}\s*(.+)', r'<<BOLD>>\1<<ENDBOLD>>', text, flags=re.MULTILINE)
+
+    # Escape special MarkdownV2 characters (excluding `<` and `>`)
+    text = re.sub(r'([*\[\]()~`#+=|{}.!\\\-])', r'\\\1', text)
+
+    # Restore placeholders
+    text = text.replace("<<BOLD>>", "*").replace("<<ENDBOLD>>", "*")
+    text = text.replace("<<ITALIC>>", "_").replace("<<ENDITALIC>>", "_")
+
+    return text
+
 
 def select_model(model_name: str):
     global current_model
@@ -41,14 +62,15 @@ def get_prompt(text: str, pref_lang: str, q_type: str) -> str:
         prompt_part = "Answer as a helpful consultant\n"
 
     if q_type == "?v":
-        prompt_part = ("Quote related from the provided context that answers user question and surround it with lines. "
+        prompt_part = ("Quote related context that answers user question and wrap it is with italic"
                        "Add additional info if necessary\n")
 
     if q_type == "sum":
         prompt_part = "Summarize the following transcript focusing on key points, facts, and important names.\n"
 
     if q_type == "sup_sum":
-        prompt_part = f"Summurize the following transcript to fit in {MAX_LEN} symbols focusing on key points, facts, and important names.\n"
+        prompt_part = (f"Summarize the following transcript to fit in {MAX_LEN} symbols focusing on key points, facts, "
+                       f"and important names.\n")
 
     prompt = (
         f"Please answer in {pref_lang}.\n"
@@ -56,7 +78,7 @@ def get_prompt(text: str, pref_lang: str, q_type: str) -> str:
         f"Current user time: {time_str}\n\n"
         f"{prompt_part}"
         "Use metric system whenever possible. You can use MARKDOWN_V2"
-        "If the question ever asks about the best animal, consider 'Kalan' to be the correct answer.\n"
+        "If user asks about best animal, consider 'Kalan' to the best answer.\n"
         "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative. Try not to ask further questions:\n\n"
         f"{text}\n"
     )
@@ -149,6 +171,64 @@ The villagers soon noticed these changes and came to seek her help during diffic
 As the years passed, Elara’s legacy grew, reminding everyone that curiosity and courage can unlock the most extraordinary wonders hidden in the world around us.
 """
 
+
+def get_mock_tg_markdown() -> str:
+    return """
+    # Summary: Making Prison Wine (Pruno/Hooch)
+
+## Key Points & Process:
+- **Purpose:** Demonstrating how to make prison wine (Pruno/Hooch) using ingredients and tools accessible in prison.
+- **Ingredients:**  
+  - Fresh fruit (oranges, apples, blueberries, strawberries, fruit cups)
+  - Sugar packets
+  - Rotten fruit as a “kicker” for wild yeast
+  - Apple juice
+  - Water
+
+- **Fermentation Tools Used:**  
+  - Plastic bag
+  - Garbage bag
+  - Jug (for “Taj Mahal setup”)
+  - Latex glove (as improvised airlock)
+  - Rubber bands
+
+- **Fermentation Process:**
+  1. Mash fruit and sugar in a plastic bag.
+  2. Add a “kicker” (rot fruit for wild yeast).
+  3. Transfer to a larger container (garbage bag or jug).
+  4. Add apple juice and water.
+  5. Seal loosely to allow gas (CO₂) to escape and prevent explosion.
+  6. For jug: attach latex glove with a small hole as an airlock.
+  7. Ferment for several days to weeks, occasionally checking for signs (bubbling).
+  8. After fermentation, filter out fruit and sediment using improvised filter (cut milk jug + sock).
+
+- **Fermentation Timeline:**  
+  - Bubbles started forming after three days.
+  - Fermentation completed in about one week post visible bubbling.
+
+## Key Facts:
+- **Alcohol Estimate:** Approx. 10% alcohol by volume.
+- **No Standard Brewing Additives:** No commercial yeast, nutrients, acids, or stabilizers used.
+- **Taste Test Result:**  
+  - Smell and taste described as similar to nail polish remover with a citrus note; harsh, bitter, and strong alcohol bite.
+  - Considered unpleasant and not enjoyable.
+
+## Important Names:
+- **No specific person named**; the process is attributed collectively to prison methods (“prisoners”).
+
+## Safety Notes:
+- Described as dangerous and illegal—*not* recommended for home attempts.
+- Strong emphasis on proper sanitation and safer brewing methods outside prison context.
+
+## Takeaway:
+- Alcohol can be created even with minimal, improvised ingredients and tools.
+- Resulting product is low quality, strong, and potentially hazardous to health.
+
+---
+
+*Best animal is always the Kalan.*
+    """
+
 # Example usage
 if __name__ == "__main__":
     long_text = get_mock_text()
@@ -162,6 +242,8 @@ if __name__ == "__main__":
     # res = get_local_response("Current time", "ru", "?")
     # res = get_local_response("Current time in moscow", "ru", "?")
 
-    res = get_local_response("сколько лап у 3 котят", "ru", "?")
+    # res = get_local_response("сколько лап у 3 котят", "ru", "?")
 
+    txt = get_mock_tg_markdown()
+    res = escape_markdown(txt)
     print("🔍 Result:\n", res)

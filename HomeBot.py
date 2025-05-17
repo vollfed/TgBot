@@ -150,7 +150,7 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Transcript finished")
 
     if lang not in result["available_languages"]:
-        await update.message.reply_text(
+        msg_res = await update.message.reply_text(
             f"⚠️ Transcript for your selected lang - '{lang}' not found.\n")
     else:
         await msg_start.delete()
