@@ -8,7 +8,7 @@ from logging.handlers import RotatingFileHandler
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler,filters
 from src.service.YTService import get_video_id, fetch_transcript
-from src.service.LLMService import summarize_text, select_model
+from src.service.LLMService import summarize_text,generate_response, select_model
 from src.service.CredentialsService import get_credential
 
 # Ensure logs directory exists
@@ -163,8 +163,11 @@ async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(chunk)
 
     logger.info(f"Transcript sent to user {user.id} ({user.username}), length {len(result)} chars")
-
 async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await generate_summary(update,context,"sum")
+async def sup_sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await generate_summary(update, context, "sup_sum")
+async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q_type : str):
     user = update.message.from_user
     logger.info(f"User {user.id} ({user.username}) requested summary'")
 
@@ -172,10 +175,10 @@ async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     title = user_last_title[user.id]
     lang = user_languages[user.id]
 
-    result = summarize_text(result,title, lang)
+    result = await summarize_text(result,title, lang, q_type)
 
     for chunk in split_message(result):
-        await update.message.reply_text(chunk)
+        await update.message.reply_text(chunk,parse_mode="Markdown")
     logger.info(f"Summary sent to user {user.id} ({user.username}), length {len(result)} chars")
 
 async def sel_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -190,6 +193,39 @@ async def sel_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ Model switched to *{model_name}*", parse_mode="Markdown")
     except ValueError:
         await update.message.reply_text("❌ Invalid model. Please choose `gpt` or `local`.", parse_mode="Markdown")
+
+# /q <question>
+async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not context.args:
+        await update.message.reply_text("❗ Please provide a question.")
+        return
+
+    question = " ".join(context.args)
+    response = await generate_response(question,parse_mode="Markdown")
+    await update.message.reply_text(response)
+
+# /qv <question>
+async def question_with_video_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_id = user.id
+
+    if not context.args:
+        await update.message.reply_text("❗ Please provide a question.")
+        return
+
+    question = " ".join(context.args)
+
+    try:
+        context_text = user_last_ts[user_id]
+        title = user_last_title.get(user_id, "Unknown Title")
+        lang = user_languages.get(user_id, "en")
+
+        response = generate_response(question, context_text, title, lang)
+        await update.message.reply_text(response,parse_mode="Markdown")
+    except KeyError as e:
+        await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
@@ -212,8 +248,11 @@ def main():
     application.add_handler(CommandHandler("ts", ts_command))
     application.add_handler(CommandHandler("show", show_command))
     application.add_handler(CommandHandler("sm", sum_command))
+    application.add_handler(CommandHandler("supsm", sup_sum_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("select_model", sel_model_command))
+    application.add_handler(CommandHandler("q", question_command))
+    application.add_handler(CommandHandler("qv", question_with_video_context))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
     print("Bot started...")

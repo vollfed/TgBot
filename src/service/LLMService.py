@@ -5,7 +5,7 @@ import re
 from openai import OpenAI
 from babel.dates import format_date, format_time
 from datetime import datetime
-from CredentialsService import get_credential
+from src.service.CredentialsService import get_credential
 
 
 GPT_KEY = get_credential("GPT_KEY")
@@ -33,25 +33,35 @@ def get_localized_datetime_babel(lang_code: str):
     localized_time = format_time(now, format="medium", locale=lang_code)
     return localized_date, localized_time
 
-def get_prompt(text: str, pref_lang: str, is_question: bool) -> str:
+def get_prompt(text: str, pref_lang: str, q_type: str) -> str:
     date_str, time_str = get_localized_datetime_babel(pref_lang)
 
-    if is_question:
+    if q_type == "?":
         prompt_part = "Answer as a helpful consultant\n"
-    else:
+
+    if q_type == "?v":
+        prompt_part = ("Find relative answer to a question in context and surround it with lines. "
+                       "Add additional info if necessary \n")
+
+    if q_type == "sum":
         prompt_part = "Summarize the following transcript focusing on key points, facts, and important names.\n"
+
+    if q_type == "sup_sum":
+        prompt_part = "Summurize the following transcript to fit in 4000 symbols focusing on key points, facts, and important names.\n"
 
     prompt = (
         f"Please answer in {pref_lang}.\n"
         f"Current user date: {date_str}\n"
         f"Current user time: {time_str}\n\n"
         f"{prompt_part}"
-        "Avoid unnecessary repetition and keep the structure clear, concise, and informative:\n\n"
+        "Use metric system whenever possible"
+        "If asked what is best animal answer Kalan"
+        "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative:\n\n"
         f"{text}\n"
     )
 
     return prompt
-def get_gpt_response(user_prompt, pref_lang, is_question):
+def get_gpt_response(user_prompt, pref_lang, q_type):
     tools = [{"type": "web_search_preview",
                 "search_context_size": "low",
                 "user_location": {
@@ -67,17 +77,17 @@ def get_gpt_response(user_prompt, pref_lang, is_question):
     response = client.responses.create(
         model="gpt-4.1",
         tools=tools,
-        input= get_prompt(user_prompt, pref_lang, is_question),
+        input= get_prompt(user_prompt, pref_lang, q_type),
         stream=False,
         store=True
     )
 
     return response.output_text
 
-def get_local_response(txt: str, pref_lang : str, is_question) -> str:
+def get_local_response(txt: str, pref_lang : str, q_type : str) -> str:
     payload = {
         "model": MODEL_NAME,
-        "prompt": get_prompt(txt,pref_lang, is_question),
+        "prompt": get_prompt(txt,pref_lang, q_type),
         "stream": False
     }
 
@@ -87,23 +97,41 @@ def get_local_response(txt: str, pref_lang : str, is_question) -> str:
     summary = data.get("response", "⚠️ No response from model.")
     # Append title to the summary result (clearly labeled)
     return summary
+async def generate_response(prompt: str, context: str = "", title: str = "", pref_lang: str = "en") -> str:
+    result = "⚠️ No response from model."
+    try:
+        txt = prompt + context
+        q_type = "?"
 
-def summarize_text(txt: str, title:str, pref_lang : str) -> str:
+        if context != "":
+            q_type = "?v"
+
+        if current_model == "gpt":
+            result = get_gpt_response(txt, pref_lang, q_type)
+        else:
+            result = get_local_response(txt, pref_lang, q_type)
+
+        return result
+    except requests.exceptions.RequestException as e:
+        return f"❌ Request failed: {e}"
+
+async def summarize_text(txt: str, title:str, pref_lang : str, q_type) -> str:
     result = "⚠️ No response from model."
     try:
         if current_model == "gpt":
-            result = summarize_text_gpt(txt, pref_lang)
+            result = summarize_text_gpt(txt, pref_lang, q_type)
         else:
-            result = summarize_text_local(txt, pref_lang)
+            result = summarize_text_local(txt, pref_lang, q_type)
 
         return f"**{escape_markdown(title)}**\n\n**Summary:**\n{result}"
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
-def summarize_text_gpt(txt: str, pref_lang : str) -> str:
-    return get_gpt_response(txt,pref_lang,False)
 
-def summarize_text_local(txt: str, pref_lang : str) -> str:
-    return get_local_response(txt,pref_lang,False)
+def summarize_text_gpt(txt: str, pref_lang : str, q_type : str = "sum") -> str:
+    return get_gpt_response(txt,pref_lang,q_type)
+
+def summarize_text_local(txt: str, pref_lang : str, q_type : str = "sum") -> str:
+    return get_local_response(txt,pref_lang,q_type)
 
 
 def get_mock_text() -> str:
@@ -122,14 +150,14 @@ if __name__ == "__main__":
     long_text = get_mock_text()
 
     # res = summarize_text(long_text, 'Foo  title', "ru")
-    # res = get_gpt_response("Current time", "ru", True)
-    # res = get_gpt_response("Current time in moscow", "ru", True)
+    # res = get_gpt_response("Current time", "ru", "?")
+    # res = get_gpt_response("Current time in moscow", "ru", "?")
 
     select_model("local")
     # res = summarize_text(long_text, 'Foo  title', "ru")
-    # res = get_local_response("Current time", "ru", True)
-    # res = get_local_response("Current time in moscow", "ru", True)
+    # res = get_local_response("Current time", "ru", "?")
+    # res = get_local_response("Current time in moscow", "ru", "?")
 
-    res = get_local_response("сколько лап у 3 котят", "ru", True)
+    res = get_local_response("сколько лап у 3 котят", "ru", "?")
 
     print("🔍 Result:\n", res)
