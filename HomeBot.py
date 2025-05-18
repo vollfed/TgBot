@@ -72,6 +72,20 @@ def safe_detect(text: str) -> str:
     except Exception:
         return "en"
 
+def append_to_context(new_text: str, user_id: int) -> str:
+    user_context = get_user_context(user_id)
+    if user_context and user_context.get("continue_context"):
+        return (user_context.get("transcript") or "") + "\n" + new_text
+    return new_text
+
+
+def append_to_title(new_title: str, user_id: int) -> str:
+    user_context = get_user_context(user_id)
+    if user_context and user_context.get("continue_context"):
+        return (user_context.get("title") or "") + "\n" + new_title
+    return new_title
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     message = update.message
@@ -91,6 +105,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # YouTube link check
         if re.search(YOUTUBE_REGEX, text):
             logger.debug(f"Detected YouTube link from {user.id}")
+            store_message(user.id, text)
             return await ts_command(update, context)
 
         # Web URL check
@@ -104,10 +119,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 save_user_context(
                     user.id,
-                    transcript=context_data['transcript'],
-                    title=context_data['title'],
+                    transcript=append_to_context(context_data['transcript'], user.id),
+                    title=append_to_title(context_data['title'], user.id),
                     language=context_data['language']
                 )
+                store_message(user.id, text)
             except Exception as e:
                 logger.exception(f"Error extracting from URL: {e}")
                 await message.reply_text("❌ Failed to extract content from the URL.")
@@ -127,8 +143,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 save_user_context(
                     user.id,
-                    transcript=context_data['transcript'],
-                    title=context_data['title'],
+                    transcript=append_to_context(context_data['transcript'], user.id),
+                    title=append_to_title(context_data['title'], user.id),
                     language=context_data['language']
                 )
 
@@ -142,6 +158,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = safe_detect(text)
     # Fallback response
     response = await generate_response(text or "", "", "", lang)
+    store_message(user.id, text)
     await message.reply_text(response, parse_mode=ParseMode.MARKDOWN_V2)
 
 def split_message(text, max_length=MAX_MESSAGE_LENGTH):
@@ -223,8 +240,8 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Save context to DB
     save_user_context(
         user_id,
-        transcript=result['text'],
-        title=result['title'],
+        transcript=append_to_context(result['text'],user_id),
+        title=append_to_title(result['title'], user_id),
         language=result['selected_language']
     )
 
@@ -254,15 +271,32 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Failed getting transcript. Please try again")
 
-async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
-    logger.info(f"User {user.id} ({user.username}) requested transcript text")
+    user_id = user.id
+    args = context.args
+
+    if not args:
+        await update.message.reply_text(escape_markdown("❗ Please provide a value: `y` or `n` (e.g. `/cc y`)"), parse_mode=ParseMode.MARKDOWN_V2)
+        return
+
+    value = args[0].lower()
+    if value not in ("y", "n"):
+        await update.message.reply_text(escape_markdown("❌ Invalid value. Use `y` or `n`."), parse_mode=ParseMode.MARKDOWN_V2)
+        return
+
+    save_user_context(user_id, continue_context=(value == "y"))
+    await update.message.reply_text(f"🔁 Continue context set to: `{value}`", parse_mode=ParseMode.MARKDOWN_V2)
+
+async def get_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    logger.info(f"User {user.id} ({user.username}) requested context text")
 
     context_data = get_user_context(user.id)
 
     if not context_data or not context_data.get("transcript"):
-        await update.message.reply_text("❌ No transcript found. Use /ts after sending a YouTube link.")
-        logger.info(f"No transcript found for user {user.id}")
+        await update.message.reply_text("❌ No context found")
+        logger.info(f"No context found for user {user.id}")
         return
 
     transcript = context_data["transcript"]
@@ -270,7 +304,26 @@ async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for chunk in split_message(transcript):
         await update.message.reply_text(chunk)
 
-    logger.info(f"Transcript sent to user {user.id} ({user.username}), length {len(transcript)} chars")
+    logger.info(f"Context sent to user {user.id} ({user.username}), length {len(transcript)} chars")
+
+
+async def get_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    logger.info(f"User {user.id} ({user.username}) requested title text")
+
+    context_data = get_user_context(user.id)
+
+    if not context_data or not context_data.get("title"):
+        await update.message.reply_text("❌ No title found")
+        logger.info(f"No title found for user {user.id}")
+        return
+
+    transcript = context_data["title"]
+
+    for chunk in split_message(transcript):
+        await update.message.reply_text(chunk)
+
+    logger.info(f"Title sent to user {user.id} ({user.username}), length {len(transcript)} chars")
 
 async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Also support optional lang override in /sm (e.g. /sm en)
@@ -387,16 +440,17 @@ async def question_with_context(update: Update, context: ContextTypes.DEFAULT_TY
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
 🤖 **Available Commands**:
-/start – Start the bot
-/help – Show this help message
-/sl <lang_code> – Set your preferred transcript language (e.g. `/sl en`)
-/ts – Fetch and save transcript from the most recent YouTube link you sent
-/show – Show the last saved transcript
-/sm – Summarize the last saved transcript
-/ssm [max_len] [lang]– Super summarize with optional max length and responce lang (e.g. `/supsm 300 ru`)
-/select_model <gpt-4|local> – Switch between GPT or local model
-/q <question> – Ask a general question (no video context)
-/qc <question> – Ask a question using saved context
+/start – Start the bot  
+/help – Show this help message  
+/sl <lang_code> – Set your preferred transcript language (e.g. `/sl en`)  
+/ts – Fetch and save transcript from the most recent YouTube link you sent  
+/show – Show the last saved transcript  
+/sm – Summarize the last saved transcript  
+/ssm [max_len] [lang] – Super summarize with optional max length and response language (e.g. `/ssm 300 ru`)  
+/select_model <gpt-4|local> – Switch between GPT or local model  
+/q <question> – Ask a general question (no video context)  
+/qc <question> – Ask a question using saved context  
+/cc <y|n> – Enable or disable *context continuation* (e.g. `/cc y`)  
 """
     await update.message.reply_text(escape_markdown(help_text), parse_mode=ParseMode.MARKDOWN_V2)
     logger.info(f"User {update.message.from_user.id} used /help")
@@ -407,7 +461,9 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("sl", sl_command))
     application.add_handler(CommandHandler("ts", ts_command))
-    application.add_handler(CommandHandler("show", show_command))
+    application.add_handler(CommandHandler("gt", get_title))
+    application.add_handler(CommandHandler("gc", get_context))
+    application.add_handler(CommandHandler("cc", cc_command))
     application.add_handler(CommandHandler("sm", sum_command))
     application.add_handler(CommandHandler("ssm", sup_sum_command))
     application.add_handler(CommandHandler("help", help_command))

@@ -185,8 +185,8 @@ def get_gpt_response(querry, context, pref_lang, q_type):
     tools = []
 
     response = client.responses.create(
-        # model="gpt-4.1",
-        model="gpt-4.1-nano",
+        model="gpt-4.1",
+        #model="gpt-4.1-nano",
         tools=tools,
         input=get_prompt(querry, context, pref_lang, q_type),
         stream=False,
