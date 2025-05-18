@@ -166,8 +166,12 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(5)
     await msg_res.delete()
     await msg_lang.delete()
-    await update.message.reply_text("✅ Ready to process")
 
+    text = result.get('text')
+    if text is not None and len(text.strip()) > 0:
+        await update.message.reply_text("✅ Ready to process")
+    else:
+        await update.message.reply_text("❌ Failed getting transcript. Please try again")
 
 async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
