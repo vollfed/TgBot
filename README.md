@@ -13,5 +13,5 @@ Telegram bot for fun
   _Example:_ `/ssm 300 ru`  
 - `/select_model <gpt-4|local>` – Switch between GPT or local model  
 - `/q <question>` – Ask a general question (no video context)  
-- `/qv <question>` – Ask a question using saved transcript context  
+- `/qc <question>` – Ask a question using saved context  
 

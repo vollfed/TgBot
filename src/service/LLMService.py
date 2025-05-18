@@ -145,8 +145,8 @@ def get_prompt(querry: str, context: str, pref_lang: str, q_type: str) -> str:
     if q_type == "?":
         prompt_part = "Answer as a helpful consultant\n"
 
-    if q_type == "?v":
-        prompt_part = ("Quote related context that answers user question and wrap it is with italic"
+    if q_type == "?c":
+        prompt_part = ("Quote  related context to answers user question and wrap it is with italic \n"
                        "Add additional info if necessary\n")
 
     if q_type == "sum":
@@ -185,7 +185,8 @@ def get_gpt_response(querry, context, pref_lang, q_type):
     tools = []
 
     response = client.responses.create(
-        model="gpt-4.1",
+        # model="gpt-4.1",
+        model="gpt-4.1-nano",
         tools=tools,
         input=get_prompt(querry, context, pref_lang, q_type),
         stream=False,
@@ -216,7 +217,7 @@ async def generate_response(querry: str, context: str = "", title: str = "", pre
         q_type = "?"
 
         if context != "":
-            q_type = "?v"
+            q_type = "?c"
 
         if DEFAULT_MODEL == "gpt-4":
             result = get_gpt_response(querry, context, pref_lang, q_type)

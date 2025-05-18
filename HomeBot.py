@@ -2,12 +2,13 @@ import re
 import os
 import json
 import logging
-
+import tempfile
 import asyncio
 
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
-from telegram import Update
+from telegram import Update, Document
+from langdetect import detect
 from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler,filters
 
@@ -15,6 +16,7 @@ from src.service.DBService import init_db, store_message, get_last_messages, sav
 from src.service.YTService import get_video_id, fetch_transcript
 from src.service.LLMService import summarize_text,generate_response, select_model, escape_markdown, clean_and_trim_text
 from src.service.CredentialsService import get_credential
+from src.service.FIleService import extract_text, is_valid_url
 
 # Ensure logs directory exists
 os.makedirs("logs", exist_ok=True)
@@ -52,17 +54,84 @@ YOUTUBE_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
 # Usage
 TOKEN = get_credential("TG_TOKEN")
 
+def safe_detect(text: str) -> str:
+    try:
+        if not text or len(text) < 3:
+            return "en"  # default for too short input
+        lang = detect(text)
+        if lang not in ("en", "ru"):
+            return "en"
+        return lang
+    except Exception:
+        return "en"
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
-    text = update.message.text
+    message = update.message
+    text = message.text
+    document: Document = message.document if message.document else None
 
-    if not text.startswith("/"):
-        store_message(user.id, text)
-        logger.debug(f"Stored message for user {user.id}: {text}")
+    context_data = context.user_data.setdefault("context_data", {})
 
-        match = re.search(YOUTUBE_REGEX, text)
-        if match:
+    if text and text.startswith("/"):
+        return
+
+    if text:
+        # Log the message
+        logger.debug(f"Received message from {user.id}: {text}")
+
+        # YouTube link check
+        if re.search(YOUTUBE_REGEX, text):
+            logger.debug(f"Detected YouTube link from {user.id}")
             return await ts_command(update, context)
+
+        # Web URL check
+        if is_valid_url(text):
+            try:
+                extracted_text = await extract_text(text)
+                context_data["transcript"] = extracted_text
+                context_data["title"] = text
+                context_data["language"] = safe_detect(extracted_text)
+                await message.reply_text("✅ Web page content saved for processing.")
+                update_context = True
+            except Exception as e:
+                logger.exception(f"Error extracting from URL: {e}")
+                await message.reply_text("❌ Failed to extract content from the URL.")
+            return
+
+    # PDF document handling
+    if document and document.file_name.lower().endswith(".pdf"):
+        try:
+            file = await document.get_file()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                await file.download_to_drive(custom_path=tmp_file.name)
+                extracted_text = await extract_text(tmp_file.name)
+                context_data["transcript"] = extracted_text
+                context_data["title"] = document.file_name
+                context_data["language"] = safe_detect(extracted_text)
+                await message.reply_text("✅ PDF content saved for processing.")
+                update_context = True
+        except Exception as e:
+            logger.exception(f"Error extracting from PDF: {e}")
+            await message.reply_text("❌ Failed to extract content from the PDF.")
+        finally:
+            if 'tmp_file' in locals() and os.path.exists(tmp_file.name):
+                os.unlink(tmp_file.name)
+        return
+
+
+    if update_context:
+        # Save context to DB
+        save_user_context(
+            user_id,
+            transcript=context_data['text'],
+            title=context_data['title'],
+            language=context_data['selected_language']
+        )
+
+    # Fallback response
+    response = await generate_response(text or "", "", "", safe_detect(text))
+    await message.reply_text(response, parse_mode=ParseMode.MARKDOWN_V2)
 
 def split_message(text, max_length=MAX_MESSAGE_LENGTH):
     """Split text into chunks smaller than max_length without breaking words."""
@@ -263,7 +332,6 @@ async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     question = " ".join(context.args)
-    response = await generate_response(question,)
     context_data = get_user_context(user.id)
 
     if context_data is None:
@@ -279,7 +347,7 @@ async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(response,parse_mode=ParseMode.MARKDOWN_V2)
 
 # /qv <question>
-async def question_with_video_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def question_with_context(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
 
@@ -317,7 +385,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /ssm [max_len] [lang]– Super summarize with optional max length and responce lang (e.g. `/supsm 300 ru`)
 /select_model <gpt-4|local> – Switch between GPT or local model
 /q <question> – Ask a general question (no video context)
-/qv <question> – Ask a question using saved transcript context
+/qc <question> – Ask a question using saved context
 """
     await update.message.reply_text(escape_markdown(help_text), parse_mode=ParseMode.MARKDOWN_V2)
     logger.info(f"User {update.message.from_user.id} used /help")
@@ -334,7 +402,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("select_model", sel_model_command))
     application.add_handler(CommandHandler("q", question_command))
-    application.add_handler(CommandHandler("qv", question_with_video_context))
+    application.add_handler(CommandHandler("qc", question_with_context))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
     print("Bot started...")
