@@ -68,6 +68,7 @@ def safe_detect(text: str) -> str:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     message = update.message
+
     text = message.text
     document: Document = message.document if message.document else None
 
@@ -93,7 +94,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context_data["title"] = text
                 context_data["language"] = safe_detect(extracted_text)
                 await message.reply_text("✅ Web page content saved for processing.")
-                update_context = True
+
+                save_user_context(
+                    user.id,
+                    transcript=context_data['transcript'],
+                    title=context_data['title'],
+                    language=context_data['selected_language']
+                )
             except Exception as e:
                 logger.exception(f"Error extracting from URL: {e}")
                 await message.reply_text("❌ Failed to extract content from the URL.")
@@ -110,7 +117,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context_data["title"] = document.file_name
                 context_data["language"] = safe_detect(extracted_text)
                 await message.reply_text("✅ PDF content saved for processing.")
-                update_context = True
+
+                save_user_context(
+                    user.id,
+                    transcript=context_data['transcript'],
+                    title=context_data['title'],
+                    language=context_data['selected_language']
+                )
+
         except Exception as e:
             logger.exception(f"Error extracting from PDF: {e}")
             await message.reply_text("❌ Failed to extract content from the PDF.")
@@ -118,16 +132,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 'tmp_file' in locals() and os.path.exists(tmp_file.name):
                 os.unlink(tmp_file.name)
         return
-
-
-    if update_context:
-        # Save context to DB
-        save_user_context(
-            user_id,
-            transcript=context_data['text'],
-            title=context_data['title'],
-            language=context_data['selected_language']
-        )
 
     # Fallback response
     response = await generate_response(text or "", "", "", safe_detect(text))
@@ -302,7 +306,7 @@ async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q
     context_text, check, tokem_len = clean_and_trim_text(context_text, lang)
 
     if check:
-        await update.message.reply_text(f"⚠️ Input context too long - {tokem_len}. Result will be truncated.")
+        await update.message.reply_text(f"⚠️ Input context too long - {tokem_len}. Result may be truncated...")
 
     result = await summarize_text(context_text,title, lang, q_type, max_answer_len)
     await msg_start.delete()
