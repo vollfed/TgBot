@@ -1,4 +1,5 @@
-Telegram bot for fun
+Bot is ready to summarize Youtube video, url or pdf files
+It will consider last message as its context
 
 ## 🤖 Available Commands
 

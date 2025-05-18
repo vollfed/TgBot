@@ -54,11 +54,18 @@ YOUTUBE_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
 # Usage
 TOKEN = get_credential("TG_TOKEN")
 
+def contains_cyrillic(text):
+    return bool(re.search('[\u0400-\u04FF]', text))
+
 def safe_detect(text: str) -> str:
     try:
         if not text or len(text) < 3:
             return "en"  # default for too short input
         lang = detect(text)
+
+        if contains_cyrillic(text):
+            return "ru"
+
         if lang not in ("en", "ru"):
             return "en"
         return lang
@@ -99,7 +106,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user.id,
                     transcript=context_data['transcript'],
                     title=context_data['title'],
-                    language=context_data['selected_language']
+                    language=context_data['language']
                 )
             except Exception as e:
                 logger.exception(f"Error extracting from URL: {e}")
@@ -122,7 +129,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user.id,
                     transcript=context_data['transcript'],
                     title=context_data['title'],
-                    language=context_data['selected_language']
+                    language=context_data['language']
                 )
 
         except Exception as e:
@@ -132,9 +139,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 'tmp_file' in locals() and os.path.exists(tmp_file.name):
                 os.unlink(tmp_file.name)
         return
-
+    lang = safe_detect(text)
     # Fallback response
-    response = await generate_response(text or "", "", "", safe_detect(text))
+    response = await generate_response(text or "", "", "", lang)
     await message.reply_text(response, parse_mode=ParseMode.MARKDOWN_V2)
 
 def split_message(text, max_length=MAX_MESSAGE_LENGTH):
@@ -408,6 +415,7 @@ def main():
     application.add_handler(CommandHandler("q", question_command))
     application.add_handler(CommandHandler("qc", question_with_context))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    application.add_handler(MessageHandler(filters.Document.PDF, handle_message))
 
     print("Bot started...")
     application.run_polling()
