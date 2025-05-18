@@ -16,6 +16,19 @@ from src.service.CredentialsService import get_credential
 
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize,RegexpTokenizer
+import logging
+
+logger = logging.getLogger("HomeBotLogger")
+
+# Fallback: configure default logger only if no handlers exist
+if not logger.hasHandlers():
+    logger.setLevel(logging.DEBUG)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
 
 GPT_KEY = get_credential("GPT_KEY")
 
@@ -36,8 +49,19 @@ def get_nltk_language_code(lang: str) -> str:
     return LANG_MAP.get(lang.lower(), "english")  # Default to English if unknown
 
 def clean_and_trim_text(text: str, lang: str = "en", max_tokens: int = MAX_TOKENS_ALLOWED, model: str = DEFAULT_MODEL):
+    # Token counting
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
+
+    dirty_tokens = enc.encode(text)
+
     # Normalize whitespace
-    text = ' '.join(text.split())
+    text_arr = text.split()
+    logger.info(f"Before whitespace trim {len(text_arr)}")
+
+    text = ' '.join(text_arr)
     token_lang = get_nltk_language_code(lang)
 
     # Tokenize (fallback to RegexpTokenizer if needed)
@@ -56,18 +80,16 @@ def clean_and_trim_text(text: str, lang: str = "en", max_tokens: int = MAX_TOKEN
     filtered_words = [w for w in words if w.lower() not in stop_words and w.isalnum()]
     cleaned_text = ' '.join(filtered_words)
 
-    # Token counting
-    try:
-        enc = tiktoken.encoding_for_model(model)
-    except KeyError:
-        enc = tiktoken.get_encoding("cl100k_base")
+    logger.info(f"Stop words delete before:{len(words)} after: {len(filtered_words)}")
 
     tokens = enc.encode(cleaned_text)
     token_length = len(tokens)
 
+    logger.info(f"Cleaning result. Tokens before:{len(dirty_tokens)} after: {len(tokens)}")
+
     if token_length > max_tokens:
-        trimmed_tokens = tokens[:max_tokens]
-        cleaned_text = enc.decode(trimmed_tokens)
+        #trimmed_tokens = tokens[:max_tokens]
+        #cleaned_text = enc.decode(trimmed_tokens)
         trimmed = True
     else:
         trimmed = False

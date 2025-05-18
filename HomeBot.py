@@ -230,7 +230,7 @@ async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q
     title = context_data["title"] or "Unknown Title"
     lang = context_data["language"] or "en"
 
-    context_text, check, tokem_len = clean_and_trim_text(context_text)
+    context_text, check, tokem_len = clean_and_trim_text(context_text, lang)
 
     if check:
         await update.message.reply_text(f"⚠️ Input context too long - {tokem_len}. Result will be truncated.")
