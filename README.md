@@ -11,7 +11,7 @@ Telegram bot for fun
 - `/sm` – Summarize the last saved transcript  
 - `/ssm [max_len] [lang]` – Super summarize with optional max length and response language  
   _Example:_ `/ssm 300 ru`  
-- `/select_model <gpt|local>` – Switch between GPT or local model  
+- `/select_model <gpt-4|local>` – Switch between GPT or local model  
 - `/q <question>` – Ask a general question (no video context)  
 - `/qv <question>` – Ask a question using saved transcript context  
 

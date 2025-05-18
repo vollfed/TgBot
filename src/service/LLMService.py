@@ -1,13 +1,21 @@
 import locale
+import tiktoken
 import asyncio
 import requests
 import re
+import nltk
+
+nltk.download('punkt')
+nltk.download('stopwords')
+
 
 from openai import OpenAI
 from babel.dates import format_date, format_time
 from datetime import datetime
 from src.service.CredentialsService import get_credential
 
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize,RegexpTokenizer
 
 GPT_KEY = get_credential("GPT_KEY")
 
@@ -15,16 +23,65 @@ client = OpenAI(api_key=GPT_KEY)
 
 OLLAMA_URL = get_credential("LOCAL_LLM_URL")
 MODEL_NAME = get_credential("LLM_MODEL")
+DEFAULT_MODEL = "gpt-4"
+MAX_TOKENS_ALLOWED = 30000
 MAX_LEN = 500
 
-current_model = "gpt"
+LANG_MAP = {
+    "ru": "russian",
+    "en": "english"
+}
+
+def get_nltk_language_code(lang: str) -> str:
+    return LANG_MAP.get(lang.lower(), "english")  # Default to English if unknown
+
+def clean_and_trim_text(text: str, lang: str = "en", max_tokens: int = MAX_TOKENS_ALLOWED, model: str = DEFAULT_MODEL):
+    # Normalize whitespace
+    text = ' '.join(text.split())
+    token_lang = get_nltk_language_code(lang)
+
+    # Tokenize (fallback to RegexpTokenizer if needed)
+    try:
+        words = word_tokenize(text, language=token_lang)
+    except LookupError:
+        tokenizer = RegexpTokenizer(r'\w+')
+        words = tokenizer.tokenize(text)
+
+    # Remove stopwords and non-alphanumeric words
+    try:
+        stop_words = set(stopwords.words(token_lang))
+    except LookupError:
+        stop_words = set()
+
+    filtered_words = [w for w in words if w.lower() not in stop_words and w.isalnum()]
+    cleaned_text = ' '.join(filtered_words)
+
+    # Token counting
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
+
+    tokens = enc.encode(cleaned_text)
+    token_length = len(tokens)
+
+    if token_length > max_tokens:
+        trimmed_tokens = tokens[:max_tokens]
+        cleaned_text = enc.decode(trimmed_tokens)
+        trimmed = True
+    else:
+        trimmed = False
+
+    return cleaned_text, trimmed, token_length
 
 def escape_markdown(text: str) -> str:
     return escape_markdown_telegram(text)
 
+
 def escape_markdown_old(text: str) -> str:
     # Telegram uses MarkdownV2 syntax, so escape these characters
     return re.sub(r'([_*[\]()~`>#+=|{}.!-])', r'\\\1', text)
+
 
 def escape_markdown_telegram(text: str) -> str:
     # Replace bold/italic with placeholders
@@ -47,10 +104,11 @@ def escape_markdown_telegram(text: str) -> str:
 
 
 def select_model(model_name: str):
-    global current_model
-    if model_name not in ("local", "gpt"):
-        raise ValueError("model_name must be either 'local' or 'gpt'")
-    current_model = model_name
+    global DEFAULT_MODEL
+    if model_name not in ("local", "gpt-4"):
+        raise ValueError("model_name must be either 'local' or 'gpt-4'")
+    DEFAULT_MODEL = model_name
+
 
 def get_localized_datetime_babel(lang_code: str):
     now = datetime.now()
@@ -58,7 +116,8 @@ def get_localized_datetime_babel(lang_code: str):
     localized_time = format_time(now, format="medium", locale=lang_code)
     return localized_date, localized_time
 
-def get_prompt(querry : str, context : str, pref_lang: str, q_type: str) -> str:
+
+def get_prompt(querry: str, context: str, pref_lang: str, q_type: str) -> str:
     date_str, time_str = get_localized_datetime_babel(pref_lang)
 
     if q_type == "?":
@@ -88,30 +147,33 @@ def get_prompt(querry : str, context : str, pref_lang: str, q_type: str) -> str:
     )
 
     return prompt
+
+
 def get_gpt_response(querry, context, pref_lang, q_type):
     tools = [{"type": "web_search_preview",
-                "search_context_size": "low",
-                "user_location": {
-                    "type": "approximate",
-                    "country": "RU",
-                    "city": "Moscow",
-                    "region": "Moscow",
-                }
-                }]
+              "search_context_size": "low",
+              "user_location": {
+                  "type": "approximate",
+                  "country": "RU",
+                  "city": "Moscow",
+                  "region": "Moscow",
+              }
+              }]
 
     tools = []
 
     response = client.responses.create(
         model="gpt-4.1",
         tools=tools,
-        input= get_prompt(querry, context, pref_lang, q_type),
+        input=get_prompt(querry, context, pref_lang, q_type),
         stream=False,
         store=True
     )
 
     return response.output_text
 
-def get_local_response(querry : str, context : str, pref_lang : str, q_type : str) -> str:
+
+def get_local_response(querry: str, context: str, pref_lang: str, q_type: str) -> str:
     payload = {
         "model": MODEL_NAME,
         "prompt": get_prompt(querry, context, pref_lang, q_type),
@@ -124,6 +186,8 @@ def get_local_response(querry : str, context : str, pref_lang : str, q_type : st
     summary = data.get("response", "⚠️ No response from model.")
     # Append title to the summary result (clearly labeled)
     return summary
+
+
 async def generate_response(querry: str, context: str = "", title: str = "", pref_lang: str = "en") -> str:
     result = "⚠️ No response from model."
     try:
@@ -132,7 +196,7 @@ async def generate_response(querry: str, context: str = "", title: str = "", pre
         if context != "":
             q_type = "?v"
 
-        if current_model == "gpt":
+        if DEFAULT_MODEL == "gpt-4":
             result = get_gpt_response(querry, context, pref_lang, q_type)
         else:
             result = get_local_response(querry, context, pref_lang, q_type)
@@ -141,13 +205,13 @@ async def generate_response(querry: str, context: str = "", title: str = "", pre
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
-async def summarize_text(context: str, title:str, pref_lang : str, q_type = "sum", max_len: int =  MAX_LEN) -> str:
 
+async def summarize_text(context: str, title: str, pref_lang: str, q_type="sum", max_len: int = MAX_LEN) -> str:
     MAX_LEN = max_len
 
     result = "⚠️ No response from model."
     try:
-        if current_model == "gpt":
+        if DEFAULT_MODEL == "gpt-4":
             result = summarize_text_gpt(context, pref_lang, q_type)
         else:
             result = summarize_text_local(context, pref_lang, q_type)
@@ -156,11 +220,13 @@ async def summarize_text(context: str, title:str, pref_lang : str, q_type = "sum
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
-def summarize_text_gpt(context: str, pref_lang : str, q_type : str = "sum") -> str:
-    return get_gpt_response("",context,pref_lang,q_type)
 
-def summarize_text_local(context: str, pref_lang : str, q_type : str = "sum") -> str:
-    return get_local_response("",context,pref_lang,q_type)
+def summarize_text_gpt(context: str, pref_lang: str, q_type: str = "sum") -> str:
+    return get_gpt_response("", context, pref_lang, q_type)
+
+
+def summarize_text_local(context: str, pref_lang: str, q_type: str = "sum") -> str:
+    return get_local_response("", context, pref_lang, q_type)
 
 
 def get_mock_text() -> str:
@@ -232,21 +298,26 @@ def get_mock_tg_markdown() -> str:
 *Best animal is always the Kalan.*
     """
 
+
 # Example usage
 if __name__ == "__main__":
     long_text = get_mock_text()
 
-    res = asyncio.run(summarize_text(long_text, 'Foo  title', "ru"))
+    # res = asyncio.run(summarize_text(long_text, 'Foo  title', "ru"))
     # res = get_gpt_response("Current time","", "ru", "?")
     # res = get_gpt_response("Current time in moscow","", "ru", "?")
 
-    select_model("local")
+    # select_model("local")
     # res = summarize_text(long_text, 'Foo  title', "ru")
     # res = get_local_response("Current time","",  "ru", "?")
     # res = get_local_response("Current time in moscow","",  "ru", "?")
 
     # res = get_local_response("сколько лап у 3 котят","",  "ru", "?")
     # res = get_gpt_response("сколько лап у 3 котят","",  "ru", "?")
+
+    long_text = clean_and_trim_text(long_text)
+    # res = asyncio.run(summarize_text(long_text, 'Foo  title', "en"))
+    res = asyncio.run(summarize_text(long_text, 'Foo  title', "ru"))
 
     # txt = get_mock_tg_markdown()
     # res = escape_markdown(txt)

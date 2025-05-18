@@ -4,6 +4,7 @@ import json
 import logging
 
 import asyncio
+
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from telegram import Update
@@ -12,7 +13,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Messa
 
 from src.service.DBService import init_db, store_message, get_last_messages, save_user_context, get_user_context
 from src.service.YTService import get_video_id, fetch_transcript
-from src.service.LLMService import summarize_text,generate_response, select_model, escape_markdown
+from src.service.LLMService import summarize_text,generate_response, select_model, escape_markdown, clean_and_trim_text
 from src.service.CredentialsService import get_credential
 
 # Ensure logs directory exists
@@ -229,6 +230,11 @@ async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q
     title = context_data["title"] or "Unknown Title"
     lang = context_data["language"] or "en"
 
+    context_text, check, tokem_len = clean_and_trim_text(context_text)
+
+    if check:
+        await update.message.reply_text(f"⚠️ Input context too long - {tokem_len}. Result will be truncated.")
+
     result = await summarize_text(context_text,title, lang, q_type, max_answer_len)
     await msg_start.delete()
 
@@ -309,7 +315,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /show – Show the last saved transcript
 /sm – Summarize the last saved transcript
 /ssm [max_len] [lang]– Super summarize with optional max length and responce lang (e.g. `/supsm 300 ru`)
-/select_model <gpt|local> – Switch between GPT or local model
+/select_model <gpt-4|local> – Switch between GPT or local model
 /q <question> – Ask a general question (no video context)
 /qv <question> – Ask a question using saved transcript context
 """
