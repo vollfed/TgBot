@@ -12,7 +12,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Messa
 
 from src.service.DBService import init_db, store_message, get_last_messages, save_user_context, get_user_context
 from src.service.YTService import get_video_id, fetch_transcript
-from src.service.LLMService import summarize_text,generate_response, select_model
+from src.service.LLMService import summarize_text,generate_response, select_model, escape_markdown
 from src.service.CredentialsService import get_credential
 
 # Ensure logs directory exists
@@ -133,7 +133,7 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context_data = get_user_context(user_id)
     lang = context_data["language"] if context_data and context_data.get("language") else "en"
 
-    msg_start = await update.message.reply_text("Fetching transcript...")
+    msg_start = await update.message.reply_text("⏳ Fetching transcript...")
     logger.info(f"User {user_id} ({user.username}) requested transcript for video '{video_id}' with lang '{lang}'")
 
     result = fetch_transcript(video_id, lang)
@@ -150,9 +150,12 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Transcript finished")
 
     if lang not in result["available_languages"]:
+        await msg_found.delete()
+        await msg_start.delete()
         msg_res = await update.message.reply_text(
             f"⚠️ Transcript for your selected lang - '{lang}' not found.\n")
     else:
+        await msg_found.delete()
         await msg_start.delete()
         msg_res = await update.message.reply_text("Transcript saved.")
 
@@ -163,7 +166,6 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(5)
     await msg_res.delete()
     await msg_lang.delete()
-    await msg_found.delete()
     await update.message.reply_text("✅ Ready to process")
 
 
@@ -212,6 +214,8 @@ async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q
     user = update.message.from_user
     logger.info(f"User {user.id} ({user.username}) requested summary'")
 
+    msg_start = await update.message.reply_text("⏳ Generating summary...")
+
     context_data = get_user_context(user.id)
     if context_data is None:
         await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
@@ -222,6 +226,7 @@ async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q
     lang = context_data["language"] or "en"
 
     result = await summarize_text(context_text,title, lang, q_type, max_answer_len)
+    await msg_start.delete()
 
     for chunk in split_message(result):
         await update.message.reply_text(chunk,parse_mode=ParseMode.MARKDOWN_V2)
@@ -292,7 +297,7 @@ async def question_with_video_context(update: Update, context: ContextTypes.DEFA
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
-🤖 *Available Commands*:
+🤖 **Available Commands**:
 /start – Start the bot
 /help – Show this help message
 /sl <lang_code> – Set your preferred transcript language (e.g. `/sl en`)
@@ -304,7 +309,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /q <question> – Ask a general question (no video context)
 /qv <question> – Ask a question using saved transcript context
 """
-    await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
+    await update.message.reply_text(escape_markdown(help_text), parse_mode=ParseMode.MARKDOWN_V2)
     logger.info(f"User {update.message.from_user.id} used /help")
 
 def main():

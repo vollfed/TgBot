@@ -1,4 +1,5 @@
 import locale
+import asyncio
 import requests
 import re
 
@@ -40,6 +41,8 @@ def escape_markdown_telegram(text: str) -> str:
     text = text.replace("<<BOLD>>", "*").replace("<<ENDBOLD>>", "*")
     text = text.replace("<<ITALIC>>", "_").replace("<<ENDITALIC>>", "_")
 
+    text = re.sub(r'([<>_])', r'\\\1', text)
+
     return text
 
 
@@ -55,7 +58,7 @@ def get_localized_datetime_babel(lang_code: str):
     localized_time = format_time(now, format="medium", locale=lang_code)
     return localized_date, localized_time
 
-def get_prompt(text: str, pref_lang: str, q_type: str) -> str:
+def get_prompt(querry : str, context : str, pref_lang: str, q_type: str) -> str:
     date_str, time_str = get_localized_datetime_babel(pref_lang)
 
     if q_type == "?":
@@ -76,15 +79,16 @@ def get_prompt(text: str, pref_lang: str, q_type: str) -> str:
         f"Please answer in {pref_lang}.\n"
         f"Current user date: {date_str}\n"
         f"Current user time: {time_str}\n\n"
-        f"{prompt_part}"
-        "Use metric system whenever possible. You can use MARKDOWN_V2"
-        "If user asks about best animal, consider 'Kalan' to the best answer.\n"
-        "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative. Try not to ask further questions:\n\n"
-        f"{text}\n"
+        "CONTEXT SETTINGS: \n"
+        "Use metric system whenever possible. You can use MARKDOWN_V2 \n"
+        "If QUESTION asks about best animal, consider 'Kalan' to the best answer. \n"
+        "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative. Try not to ask further questions: \n"
+        f" QUESTION: {querry} \n"
+        f" CONTEXT: {context}\n"
     )
 
     return prompt
-def get_gpt_response(user_prompt, pref_lang, q_type):
+def get_gpt_response(querry, context, pref_lang, q_type):
     tools = [{"type": "web_search_preview",
                 "search_context_size": "low",
                 "user_location": {
@@ -100,17 +104,17 @@ def get_gpt_response(user_prompt, pref_lang, q_type):
     response = client.responses.create(
         model="gpt-4.1",
         tools=tools,
-        input= get_prompt(user_prompt, pref_lang, q_type),
+        input= get_prompt(querry, context, pref_lang, q_type),
         stream=False,
         store=True
     )
 
     return response.output_text
 
-def get_local_response(txt: str, pref_lang : str, q_type : str) -> str:
+def get_local_response(querry : str, context : str, pref_lang : str, q_type : str) -> str:
     payload = {
         "model": MODEL_NAME,
-        "prompt": get_prompt(txt,pref_lang, q_type),
+        "prompt": get_prompt(querry, context, pref_lang, q_type),
         "stream": False
     }
 
@@ -120,44 +124,43 @@ def get_local_response(txt: str, pref_lang : str, q_type : str) -> str:
     summary = data.get("response", "⚠️ No response from model.")
     # Append title to the summary result (clearly labeled)
     return summary
-async def generate_response(prompt: str, context: str = "", title: str = "", pref_lang: str = "en") -> str:
+async def generate_response(querry: str, context: str = "", title: str = "", pref_lang: str = "en") -> str:
     result = "⚠️ No response from model."
     try:
-        txt = prompt + context
         q_type = "?"
 
         if context != "":
             q_type = "?v"
 
         if current_model == "gpt":
-            result = get_gpt_response(txt, pref_lang, q_type)
+            result = get_gpt_response(querry, context, pref_lang, q_type)
         else:
-            result = get_local_response(txt, pref_lang, q_type)
+            result = get_local_response(querry, context, pref_lang, q_type)
 
         return escape_markdown(result)
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
-async def summarize_text(txt: str, title:str, pref_lang : str, q_type, max_len: int) -> str:
+async def summarize_text(context: str, title:str, pref_lang : str, q_type = "sum", max_len: int =  MAX_LEN) -> str:
 
     MAX_LEN = max_len
 
     result = "⚠️ No response from model."
     try:
         if current_model == "gpt":
-            result = summarize_text_gpt(txt, pref_lang, q_type)
+            result = summarize_text_gpt(context, pref_lang, q_type)
         else:
-            result = summarize_text_local(txt, pref_lang, q_type)
+            result = summarize_text_local(context, pref_lang, q_type)
 
         return f"*{escape_markdown(title)}*\n\n*Summary:*\n{escape_markdown(result)}"
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
-def summarize_text_gpt(txt: str, pref_lang : str, q_type : str = "sum") -> str:
-    return get_gpt_response(txt,pref_lang,q_type)
+def summarize_text_gpt(context: str, pref_lang : str, q_type : str = "sum") -> str:
+    return get_gpt_response("",context,pref_lang,q_type)
 
-def summarize_text_local(txt: str, pref_lang : str, q_type : str = "sum") -> str:
-    return get_local_response(txt,pref_lang,q_type)
+def summarize_text_local(context: str, pref_lang : str, q_type : str = "sum") -> str:
+    return get_local_response("",context,pref_lang,q_type)
 
 
 def get_mock_text() -> str:
@@ -233,17 +236,18 @@ def get_mock_tg_markdown() -> str:
 if __name__ == "__main__":
     long_text = get_mock_text()
 
-    # res = summarize_text(long_text, 'Foo  title', "ru")
-    # res = get_gpt_response("Current time", "ru", "?")
-    # res = get_gpt_response("Current time in moscow", "ru", "?")
+    res = asyncio.run(summarize_text(long_text, 'Foo  title', "ru"))
+    # res = get_gpt_response("Current time","", "ru", "?")
+    # res = get_gpt_response("Current time in moscow","", "ru", "?")
 
     select_model("local")
     # res = summarize_text(long_text, 'Foo  title', "ru")
-    # res = get_local_response("Current time", "ru", "?")
-    # res = get_local_response("Current time in moscow", "ru", "?")
+    # res = get_local_response("Current time","",  "ru", "?")
+    # res = get_local_response("Current time in moscow","",  "ru", "?")
 
-    # res = get_local_response("сколько лап у 3 котят", "ru", "?")
+    # res = get_local_response("сколько лап у 3 котят","",  "ru", "?")
+    # res = get_gpt_response("сколько лап у 3 котят","",  "ru", "?")
 
-    txt = get_mock_tg_markdown()
-    res = escape_markdown(txt)
+    # txt = get_mock_tg_markdown()
+    # res = escape_markdown(txt)
     print("🔍 Result:\n", res)
