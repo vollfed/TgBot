@@ -11,7 +11,8 @@ def init_db():
             CREATE TABLE IF NOT EXISTS user_messages (
                 user_id INTEGER,
                 message TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                is_from_user
             )
         """)
         c.execute("""
@@ -30,18 +31,42 @@ def init_db():
 #    c.execute("ALTER TABLE user_context ADD COLUMN continue_context BOOLEAN DEFAULT 0")
 #    conn.commit()
 
-def store_message(user_id: int, text: str):
+# with sqlite3.connect(DB_PATH) as conn:
+#    c = conn.cursor()
+#    c.execute("ALTER TABLE user_messages ADD COLUMN is_from_user char DEFAULT 'Y'")
+#    conn.commit()
+
+def store_message(user_id: int, text: str, is_from_user: str = 'Y'):
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
-        c.execute("INSERT INTO user_messages (user_id, message) VALUES (?, ?)", (user_id, text))
+        c.execute(
+            "INSERT INTO user_messages (user_id, message, is_from_user) VALUES (?, ?, ?)",
+            (user_id, text, is_from_user)
+        )
         conn.commit()
 
-def get_last_messages(user_id: int, limit=10):
+
+def get_last_messages(user_id: int, limit=10, is_from_user: str = None):
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
-        c.execute("SELECT message FROM user_messages WHERE user_id=? ORDER BY timestamp DESC LIMIT ?", (user_id, limit))
+
+        query = """
+            SELECT message, is_from_user
+            FROM user_messages
+            WHERE user_id = ?
+        """
+        params = [user_id]
+
+        if is_from_user in ('Y', 'N'):
+            query += " AND is_from_user = ?"
+            params.append(is_from_user)
+
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+
+        c.execute(query, tuple(params))
         rows = c.fetchall()
-        return [row[0] for row in reversed(rows)]  # Return in chronological order
+        return list(reversed(rows))  # List of (message, is_from_user) tuples
 
 
 def save_user_context(user_id: int, transcript=None, title=None, language=None, continue_context=None):

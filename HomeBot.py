@@ -49,6 +49,7 @@ logger.addHandler(console_handler)
 
 
 MAX_MESSAGE_LENGTH = 4096
+MAX_DIALOG_CTXT = 100  #TODO add command to regulate this
 YOUTUBE_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
 
 # Usage
@@ -85,6 +86,15 @@ def append_to_title(new_title: str, user_id: int) -> str:
         return (user_context.get("title") or "") + "\n" + new_title
     return new_title
 
+def get_context_from_dialog(user_id, max_dialog_contex: int = MAX_DIALOG_CTXT) -> str:
+    messages = get_last_messages(user_id, limit=max_dialog_contex)
+    formatted = []
+
+    for msg, is_from_user in messages:
+        prefix = "USER:" if is_from_user == 'Y' else "LLM:"
+        formatted.append(f"{prefix} {msg}")
+
+    return "\n".join(formatted)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -157,8 +167,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     lang = safe_detect(text)
     # Fallback response
-    response = await generate_response(text or "", "", "", lang)
+
+    context = get_context_from_dialog(user.id)
+    response = await generate_response(text or "", context or "", "", lang)
     store_message(user.id, text)
+    store_message(user.id, response,'N')
+
     await message.reply_text(response, parse_mode=ParseMode.MARKDOWN_V2)
 
 def split_message(text, max_length=MAX_MESSAGE_LENGTH):
@@ -201,7 +215,7 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     user_id = user.id
 
-    messages = get_last_messages(user_id, limit=10)
+    messages = get_last_messages(user_id, 10, 'Y')
 
     yt_url = None
     for msg in reversed(messages):  # Search from most recent
@@ -333,7 +347,7 @@ async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await generate_summary(update, context, "sum", -1)
 
 async def sup_sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    max_answer_len = 500
+    max_answer_len = 300
     lang_override = None
 
     for arg in context.args:
@@ -371,6 +385,8 @@ async def generate_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, q
     result = await summarize_text(context_text,title, lang, q_type, max_answer_len)
     await msg_start.delete()
 
+    store_message(user.id, result, 'N')
+
     for chunk in split_message(result):
         await update.message.reply_text(chunk,parse_mode=ParseMode.MARKDOWN_V2)
     logger.info(f"Summary sent to user {user.id} ({user.username}), length {len(result)} chars")
@@ -406,7 +422,11 @@ async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     title = context_data["title"] or "Unknown Title"
     lang = context_data["language"] or "en"
 
-    response = await generate_response(question, "", title, lang)
+    context = get_context_from_dialog(user.id)
+    response = await generate_response(question, context, title, lang)
+
+    store_message(user.id, question)
+    store_message(user.id, response, 'N')
 
     await update.message.reply_text(response,parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -432,6 +452,10 @@ async def question_with_context(update: Update, context: ContextTypes.DEFAULT_TY
         lang = context_data["language"] or "en"
 
         response = await generate_response(question, context_text, title, lang)
+
+        store_message(user.id, question)
+        store_message(user.id, response, 'N')
+
         await update.message.reply_text(response,parse_mode=ParseMode.MARKDOWN_V2)
     except KeyError as e:
         await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")

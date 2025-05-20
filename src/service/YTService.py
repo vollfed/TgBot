@@ -45,11 +45,10 @@ def fetch_transcript(video_id, lang):
     title = get_video_title(video_id)
     logger.debug(f"Video title: {title}")
 
+    langs = ["en", "ru"]
     # Determine language preference order
     if contains_cyrillic(title):
         langs = ["ru", "en"]
-    else:
-        langs = ["en", "ru"]
 
     try:
         result_lang = langs[0]
@@ -60,15 +59,7 @@ def fetch_transcript(video_id, lang):
 
         available_langs = list(generated_langs.union(manual_langs))
 
-        transcript_obj = None
-        for lang in langs:
-            try:
-                transcript_obj = transcript_list.find_transcript([lang])
-                if transcript_obj:
-                    result_lang = lang
-                    break
-            except NoTranscriptFound:
-                continue
+        transcript_obj = transcript_list.find_transcript(langs)
 
         if not transcript_obj:
             return {

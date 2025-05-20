@@ -162,6 +162,7 @@ def get_prompt(querry: str, context: str, pref_lang: str, q_type: str) -> str:
         f"Current user time: {time_str}\n\n"
         "CONTEXT SETTINGS: \n"
         "Use metric system whenever possible. You can use MARKDOWN_V2 \n"
+        "Never quote messages that are marked with LLM: \n"
         "If QUESTION asks about best animal, consider 'Kalan' to the best answer. \n"
         "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative. Try not to ask further questions: \n"
         f" QUESTION: {querry} \n"
