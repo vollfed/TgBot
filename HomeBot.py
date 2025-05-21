@@ -49,8 +49,15 @@ logger.addHandler(console_handler)
 
 
 MAX_MESSAGE_LENGTH = 4096
-MAX_DIALOG_CTXT = 100  #TODO add command to regulate this
-YOUTUBE_REGEX = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/\S+"
+MAX_DIALOG_CTXT = 50  #TODO add command to regulate this
+YOUTUBE_REGEX = r"""(?x)
+    ^(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/
+    (?:
+        (?:watch\?v=|embed/|v/|shorts/)?
+        [\w\-]{11}
+    )
+    (?:[&?][^\s]*)?$
+"""
 
 # Usage
 TOKEN = get_credential("TG_TOKEN")
@@ -219,7 +226,7 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     yt_url = None
     for msg in reversed(messages):  # Search from most recent
-        match = re.search(YOUTUBE_REGEX, msg)
+        match = re.search(YOUTUBE_REGEX, msg[0])
         if match:
             yt_url = match.group(0)
             break
@@ -251,13 +258,6 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = fetch_transcript(video_id, lang)
     logger.debug(result)
 
-    # Save context to DB
-    save_user_context(
-        user_id,
-        transcript=append_to_context(result['text'],user_id),
-        title=append_to_title(result['title'], user_id),
-        language=result['selected_language']
-    )
 
     logger.info("Transcript finished")
 
@@ -275,15 +275,29 @@ async def ts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Available languages: {', '.join(result['available_languages'])}\n"
         f"Selected language: {result['selected_language']}"
     )
+
     await asyncio.sleep(5)
     await msg_res.delete()
     await msg_lang.delete()
 
     text = result.get('text')
-    if text is not None and len(text.strip()) > 0:
+    if is_valid_transcript(result):
+        # Save context to DB
+        save_user_context(
+            user_id,
+            transcript=append_to_context(result['text'], user_id),
+            title=append_to_title(result['title'], user_id)
+        )
         await update.message.reply_text("✅ Ready to process")
     else:
+        logger.warning(f"Transcript invalid or missing. Result: {result}")
         await update.message.reply_text("❌ Failed getting transcript. Please try again")
+
+def is_valid_transcript(result):
+    text = result.get('text')
+    lang = result.get('selected_language')
+    return bool(text and text.strip() and lang and lang.strip())
+
 
 async def cc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -414,10 +428,6 @@ async def question_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question = " ".join(context.args)
     context_data = get_user_context(user.id)
 
-    if context_data is None:
-        await update.message.reply_text("⚠️ No previous video context found. Use /transcript first.")
-        return
-
     context_text = context_data["transcript"]
     title = context_data["title"] or "Unknown Title"
     lang = context_data["language"] or "en"
@@ -451,7 +461,7 @@ async def question_with_context(update: Update, context: ContextTypes.DEFAULT_TY
         title = context_data["title"] or "Unknown Title"
         lang = context_data["language"] or "en"
 
-        response = await generate_response(question, context_text, title, lang)
+        response = await generate_response(question, context_text, title, lang,"?c")
 
         store_message(user.id, question)
         store_message(user.id, response, 'N')

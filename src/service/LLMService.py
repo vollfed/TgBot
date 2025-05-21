@@ -157,16 +157,18 @@ def get_prompt(querry: str, context: str, pref_lang: str, q_type: str) -> str:
                        f"and important names.\n")
 
     prompt = (
-        f"Please answer in {pref_lang}.\n"
-        f"Current user date: {date_str}\n"
-        f"Current user time: {time_str}\n\n"
+        f"CONTEXT: {context}\n\n"
         "CONTEXT SETTINGS: \n"
+        "If QUESTION asks about best animal, consider 'Kalan' to the best answer. \n"
+        f"Please answer in {pref_lang}."
+        f"Current user date: {date_str}"
+        f"Current user time: {time_str}"            
         "Use metric system whenever possible. You can use MARKDOWN_V2 \n"
         "Never quote messages that are marked with LLM: \n"
-        "If QUESTION asks about best animal, consider 'Kalan' to the best answer. \n"
+        f"{prompt_part}" 
         "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative. Try not to ask further questions: \n"
         f" QUESTION: {querry} \n"
-        f" CONTEXT: {context}\n"
+
     )
 
     return prompt
@@ -212,13 +214,10 @@ def get_local_response(querry: str, context: str, pref_lang: str, q_type: str) -
     return summary
 
 
-async def generate_response(querry: str, context: str = "", title: str = "", pref_lang: str = "en") -> str:
+async def generate_response(querry: str, context: str = "", title: str = "", pref_lang: str = "en", p_q_type: str = "?") -> str:
     result = "⚠️ No response from model."
     try:
-        q_type = "?"
-
-        if context != "":
-            q_type = "?c"
+        q_type = p_q_type
 
         if DEFAULT_MODEL == "gpt-4":
             result = get_gpt_response(querry, context, pref_lang, q_type)
