@@ -461,7 +461,9 @@ async def question_with_context(update: Update, context: ContextTypes.DEFAULT_TY
         title = context_data["title"] or "Unknown Title"
         lang = context_data["language"] or "en"
 
+        msg_start = await update.message.reply_text("⏳ Asking context...")
         response = await generate_response(question, context_text, title, lang,"?c")
+        await msg_start.delete()
 
         store_message(user.id, question)
         store_message(user.id, response, 'N')
