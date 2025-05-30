@@ -8,6 +8,10 @@ logger = logging.getLogger("HomeBotLogger")
 logger.setLevel(logging.DEBUG)
 
 from urllib.parse import urlparse, parse_qs
+import re
+from urllib.parse import urlparse, parse_qs
+
+YOUTUBE_ID_PATTERN = re.compile(r"^[\w-]{11}$")
 
 def get_video_id(url_or_id):
     """
@@ -16,28 +20,28 @@ def get_video_id(url_or_id):
     - https://www.youtube.com/watch?v=VIDEOID
     - https://youtu.be/VIDEOID
     - https://youtube.com/shorts/VIDEOID
+    - https://youtube.com/embed/VIDEOID
+    - https://youtube.com/v/VIDEOID
+    - https://youtube.com/live/VIDEOID
     - raw video IDs
     """
-    # If it's already a valid video ID
-    if len(url_or_id) == 11 and all(c.isalnum() or c in "-_" for c in url_or_id):
+    if YOUTUBE_ID_PATTERN.match(url_or_id):
         return url_or_id
 
     parsed = urlparse(url_or_id)
     netloc = parsed.netloc.lower()
-    path = parsed.path.strip("/")
+    path_parts = parsed.path.strip("/").split("/")
 
     if "youtube.com" in netloc:
-        if path.startswith("watch"):
+        if parsed.path.startswith("/watch"):
             query = parse_qs(parsed.query)
             video_id = query.get("v", [None])[0]
             if video_id:
                 return video_id
-        elif path.startswith("shorts/"):
-            return path.split("/")[1]
-        elif path.startswith("embed/") or path.startswith("v/"):
-            return path.split("/")[1]
-    elif "youtu.be" in netloc:
-        return path.split("/")[0]
+        elif path_parts[0] in {"shorts", "embed", "v", "live"} and len(path_parts) > 1:
+            return path_parts[1]
+    elif "youtu.be" in netloc and path_parts:
+        return path_parts[0]
 
     raise ValueError("Invalid YouTube URL or video ID")
 

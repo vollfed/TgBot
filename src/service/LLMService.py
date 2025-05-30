@@ -163,10 +163,14 @@ def get_prompt(querry: str, context: str, pref_lang: str, q_type: str) -> str:
         f"Please answer in {pref_lang}."
         f"Current user date: {date_str}"
         f"Current user time: {time_str}"            
-        "Use metric system whenever possible. You can use MARKDOWN_V2 \n"
+        "Use metric system whenever possible. Only output Markdown \n"
         "Never quote messages that are marked with LLM: \n"
         f"{prompt_part}" 
-        "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative. Try not to ask further questions: \n"
+        "Avoid unnecessary repetition and keep the structure short and clear, concise, and informative."
+        "Do not give warnings or notes "
+        "You use bulleted lists for output, not numbered lists "
+        "Do not repeat ideas, insights, quotes "
+        " Try not to ask further questions: \n"
         f" QUESTION: {querry} \n"
 
     )
