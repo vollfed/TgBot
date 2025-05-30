@@ -51,13 +51,16 @@ logger.addHandler(console_handler)
 MAX_MESSAGE_LENGTH = 4096
 MAX_DIALOG_CTXT = 50  #TODO add command to regulate this
 YOUTUBE_REGEX = r"""(?x)
-    ^(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/
+    ^(?:https?://)?          # optional scheme
+    (?:www\.)?               # optional www
+    (?:youtube\.com|youtu\.be)/  # domain
     (?:
-        (?:watch\?v=|embed/|v/|shorts/)?
-        [\w\-]{11}
+        (?:watch\?v=|embed/|v/|shorts/|live/)?  # valid path prefixes
     )
-    (?:[&?][^\s]*)?$
+    (?P<id>[\w\-]{11})       # the actual 11-char video ID
+    (?:[&?][^\s]*)?$         # optional query params
 """
+
 
 # Usage
 TOKEN = get_credential("TG_TOKEN")
