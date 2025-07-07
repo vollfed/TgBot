@@ -1,6 +1,7 @@
 import logging
 import re
 import requests
+from pyexpat import ExpatError
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, CouldNotRetrieveTranscript
 from urllib.parse import urlparse, parse_qs
 
@@ -114,11 +115,12 @@ def fetch_transcript(video_id, lang):
             "selected_language": transcript_obj.language_code,
             "title": title
         }
-
     except TranscriptsDisabled:
         errMsg = "Transcripts are disabled for this video."
     except CouldNotRetrieveTranscript:
         errMsg = "Could not retrieve transcript due to network or other error."
+    except ExpatError as e:
+        errMsg = "Transcript data was empty or malformed (ExpatError)."
     except Exception as e:
         errMsg = f"An error occurred: {str(e)}"
 

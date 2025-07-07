@@ -58,7 +58,7 @@ YOUTUBE_REGEX = r"""(?x)
         (?:watch\?v=|embed/|v/|shorts/|live/)?  # valid path prefixes
     )
     (?P<id>[\w\-]{11})       # the actual 11-char video ID
-    (?:[&?][^\s]*)?$         # optional query params
+    (?:[&?][^\s]*)?$         # optional query params, 
 """
 
 
