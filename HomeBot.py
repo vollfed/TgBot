@@ -358,10 +358,10 @@ async def get_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Also support optional lang override in /sm (e.g. /sm en)
-    lang_override = context.args[0].lower() if context.args else None
-    if lang_override:
+    lang_override = safe_detect(context.args[0].lower()) if context.args else None
+    if lang_override and update.message:
         save_user_context(update.message.from_user.id, language=lang_override)
-    return await generate_summary(update, context, "sum", -1)
+    return await generate_summary(update, context, "sum", None)
 
 async def sup_sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     max_answer_len = 300
@@ -373,7 +373,7 @@ async def sup_sum_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif re.fullmatch(r"[a-z]{2}", arg.lower()):
             lang_override = arg.lower()
 
-    if lang_override:
+    if lang_override and update.message:
         save_user_context(update.message.from_user.id, language=lang_override)
 
     return await generate_summary(update, context, "sup_sum", max_answer_len)

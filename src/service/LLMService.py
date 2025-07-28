@@ -139,7 +139,7 @@ def get_localized_datetime_babel(lang_code: str):
     return localized_date, localized_time
 
 
-def get_prompt(querry: str, context: str, pref_lang: str, q_type: str) -> str:
+def get_prompt(querry: str, context: str, pref_lang: str, q_type: str, max_len) -> str:
     date_str, time_str = get_localized_datetime_babel(pref_lang)
 
     if q_type == "?":
@@ -151,16 +151,18 @@ def get_prompt(querry: str, context: str, pref_lang: str, q_type: str) -> str:
 
     if q_type == "sum":
         prompt_part = "Summarize the following transcript focusing on key points, facts, and important names.\n"
-
+ 
     if q_type == "sup_sum":
-        prompt_part = (f"Summarize the following transcript to fit in {MAX_LEN} symbols focusing on key points, facts, "
+        prompt_part = (f"Summarize the following transcript to fit in {max_len} symbols focusing on key points, facts, "
                        f"and important names.\n")
+    if not q_type:
+        q_type = ""
 
     prompt = (
         f"CONTEXT: {context}\n\n"
         "CONTEXT SETTINGS: \n"
         "If QUESTION asks about best animal, consider 'Kalan' to the best answer. \n"
-        f"Please answer in {pref_lang}."
+        f"Please answer in {pref_lang} language."
         f"Current user date: {date_str}"
         f"Current user time: {time_str}"            
         "Use metric system whenever possible. Only output Markdown \n"
@@ -178,7 +180,7 @@ def get_prompt(querry: str, context: str, pref_lang: str, q_type: str) -> str:
     return prompt
 
 
-def get_gpt_response(querry, context, pref_lang, q_type):
+def get_gpt_response(querry, context, pref_lang, q_type,max_len):
     tools = [{"type": "web_search_preview",
               "search_context_size": "low",
               "user_location": {
@@ -195,7 +197,7 @@ def get_gpt_response(querry, context, pref_lang, q_type):
         model="gpt-4.1",
         #model="gpt-4.1-nano",
         tools=tools,
-        input=get_prompt(querry, context, pref_lang, q_type),
+        input=get_prompt(querry, context, pref_lang, q_type,max_len),
         stream=False,
         store=True
     )
@@ -203,10 +205,10 @@ def get_gpt_response(querry, context, pref_lang, q_type):
     return response.output_text
 
 
-def get_local_response(querry: str, context: str, pref_lang: str, q_type: str) -> str:
+def get_local_response(querry: str, context: str, pref_lang: str, q_type: str,max_len) -> str:
     payload = {
         "model": MODEL_NAME,
-        "prompt": get_prompt(querry, context, pref_lang, q_type),
+        "prompt": get_prompt(querry, context, pref_lang, q_type,max_len),
         "stream": False
     }
 
@@ -218,42 +220,43 @@ def get_local_response(querry: str, context: str, pref_lang: str, q_type: str) -
     return summary
 
 
-async def generate_response(querry: str, context: str = "", title: str = "", pref_lang: str = "en", p_q_type: str = "?") -> str:
+async def generate_response(querry: str, context: str = "", title: str = "", pref_lang: str = "en", p_q_type: str = "?", max_len: int = None) -> str:
     result = "⚠️ No response from model."
     try:
         q_type = p_q_type
 
         if DEFAULT_MODEL == "gpt-4":
-            result = get_gpt_response(querry, context, pref_lang, q_type)
+            result = get_gpt_response(querry, context, pref_lang, q_type,max_len)
         else:
-            result = get_local_response(querry, context, pref_lang, q_type)
+            result = get_local_response(querry, context, pref_lang, q_type,max_len)
 
         return escape_markdown(result)
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
 
-async def summarize_text(context: str, title: str, pref_lang: str, q_type="sum", max_len: int = MAX_LEN) -> str:
-    MAX_LEN = max_len
+async def summarize_text(context: str, title: str, pref_lang: str, q_type="sum", max_len: int = None) -> str:
+    if max_len is None:
+        max_len = MAX_LEN
 
     result = "⚠️ No response from model."
     try:
         if DEFAULT_MODEL == "gpt-4":
-            result = summarize_text_gpt(context, pref_lang, q_type)
+            result = summarize_text_gpt(context, pref_lang, max_len, q_type)
         else:
-            result = summarize_text_local(context, pref_lang, q_type)
+            result = summarize_text_local(context, pref_lang, max_len, q_type)
 
         return f"*{escape_markdown(title)}*\n\n*Summary:*\n{escape_markdown(result)}"
     except requests.exceptions.RequestException as e:
         return f"❌ Request failed: {e}"
 
 
-def summarize_text_gpt(context: str, pref_lang: str, q_type: str = "sum") -> str:
-    return get_gpt_response("", context, pref_lang, q_type)
+def summarize_text_gpt(context: str, pref_lang: str,max_len:int , q_type: str = "sum")  -> str:
+    return get_gpt_response("", context, pref_lang, q_type, max_len)
 
 
-def summarize_text_local(context: str, pref_lang: str, q_type: str = "sum") -> str:
-    return get_local_response("", context, pref_lang, q_type)
+def summarize_text_local(context: str, pref_lang: str,max_len:int, q_type: str = "sum") -> str:
+    return get_local_response("", context, pref_lang, q_type,max_len)
 
 
 def get_mock_text() -> str:
